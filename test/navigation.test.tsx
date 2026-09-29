@@ -13,7 +13,7 @@ async function renderAnonymous(initialUrl = '/') {
   });
 
   await waitFor(() => {
-    expect(screen.getByText('Sign in')).toBeOnTheScreen();
+    expect(screen.getByText('Welcome back')).toBeOnTheScreen();
   });
 
   return renderedRouter;
@@ -24,7 +24,7 @@ describe('session-aware navigation', () => {
     const renderedRouter = await renderAnonymous('/mentor');
 
     expect(renderedRouter.getPathname()).toBe('/sign-in');
-    expect(screen.getByText('Sign in')).toBeOnTheScreen();
+    expect(screen.getByText('Welcome back')).toBeOnTheScreen();
   });
 
   it('allows a student into the app but denies the mentor route', async () => {
@@ -38,9 +38,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/');
-      expect(
-        screen.getByText('Signed in as Mock Student (student).'),
-      ).toBeOnTheScreen();
+      expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
     });
 
     expect(
@@ -55,9 +53,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/');
-      expect(
-        screen.getByText('Signed in as Mock Student (student).'),
-      ).toBeOnTheScreen();
+      expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
     });
   });
 
@@ -72,9 +68,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/');
-      expect(
-        screen.getByText('Signed in as Mock Mentor (mentor).'),
-      ).toBeOnTheScreen();
+      expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
     });
 
     fireEvent.press(
@@ -102,9 +96,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/');
-      expect(
-        screen.getByText('Signed in as Mock Student (student).'),
-      ).toBeOnTheScreen();
+      expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
     });
 
     act(() => {
@@ -113,9 +105,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/');
-      expect(
-        screen.getByText('Signed in as Mock Student (student).'),
-      ).toBeOnTheScreen();
+      expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
     });
   });
 
@@ -130,9 +120,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/');
-      expect(
-        screen.getByText('Signed in as Mock Student (student).'),
-      ).toBeOnTheScreen();
+      expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
     });
 
     act(() => {
@@ -141,9 +129,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/profile');
-      expect(
-        screen.getByText('Signed in as Mock Student (student).'),
-      ).toBeOnTheScreen();
+      expect(screen.getByText('Mock Student')).toBeOnTheScreen();
     });
 
     fireEvent.press(
@@ -154,7 +140,7 @@ describe('session-aware navigation', () => {
 
     await waitFor(() => {
       expect(renderedRouter.getPathname()).toBe('/sign-in');
-      expect(screen.getByText('Sign in')).toBeOnTheScreen();
+      expect(screen.getByText('Welcome back')).toBeOnTheScreen();
     });
 
     if (router.canGoBack()) {
@@ -164,7 +150,7 @@ describe('session-aware navigation', () => {
 
       await waitFor(() => {
         expect(renderedRouter.getPathname()).toBe('/sign-in');
-        expect(screen.getByText('Sign in')).toBeOnTheScreen();
+        expect(screen.getByText('Welcome back')).toBeOnTheScreen();
       });
     }
   });
