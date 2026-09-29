@@ -19,10 +19,12 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.102.0",
+    "chess.js": "^1.4.0",
     "expo": "~57.0.15",
     "expo-constants": "~57.0.7",
     "expo-linking": "~57.0.7",
     "expo-router": "~57.0.15",
+    "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -32,6 +34,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "react-native-worklets": "0.10.1",
+    "socket.io-client": "^4.8.4",
     "zod": "4.4.3"
   },
   "devDependencies": {
