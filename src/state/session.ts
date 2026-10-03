@@ -1,3 +1,5 @@
+import { readonly } from "zod";
+
 export type UserRole = 'student' | 'mentor';
 
 export type SessionUser = {
@@ -16,7 +18,12 @@ export type SessionState =
   | {
       readonly status: 'authenticated';
       readonly user: SessionUser;
-    };
+    }
+  |
+   {
+      readonly status: 'error';
+      readonly errorMessage: string;
+   };
 
 export type SessionAction =
   | {
@@ -28,7 +35,18 @@ export type SessionAction =
     }
   | {
       readonly type: 'signedOut';
-    };
+    }
+  | {
+      readonly type: 'anonymous';
+    }
+  | {
+      readonly type: 'launchError';
+      readonly errorMessage: string;
+    }
+  | {
+      readonly type: 'launchRestore';
+    }
+  
 
 export const initialSessionState: SessionState = {
   status: 'bootstrapping',
@@ -48,6 +66,15 @@ export function sessionReducer(
       };
     case 'signedOut':
       return state.status === 'anonymous' ? state : { status: 'anonymous' };
+    case 'launchError':
+      return { 
+        status: 'error', 
+        errorMessage: action.errorMessage, 
+      };
+    case 'anonymous':
+      return { status: 'anonymous' };
+    case 'launchRestore':
+      return { status: 'bootstrapping'}
     default: {
       const exhaustiveAction: never = action;
       return exhaustiveAction;
