@@ -26,17 +26,23 @@ import {
   radii,
   spacing,
 } from '@/design/tokens';
+
 import { useSession } from '@/providers/SessionProvider';
+import { Spinner } from '@/components/ui/Spinner';
+import { InlineError } from '@/components/feedback/InlineError';
 
 const chessPiecePattern = require('@/assets/images/chess-piece-pattern.png');
 
 export default function SignInRoute() {
-  const { mockSignInAs } = useSession();
+  const { mockSignInAs, signIn, session } = useSession();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+
+  const [error, setError] = useState(session.status === 'expired' ? session.expiredMessage : '');
 
   const [btnScale] = useState(() => new Animated.Value(1));
   const pressIn = () =>
@@ -53,6 +59,34 @@ export default function SignInRoute() {
       speed: 50,
       bounciness: 4,
     }).start();
+
+  const signInPressed = async () => {
+    setError('')
+    setSigningIn(true);
+
+    if (!username || !password) {
+      setSigningIn(false);
+
+      // Show invalid-credentials message
+      setError('Please enter your username and password');
+
+      return;
+    }
+
+    try {
+      await signIn(username, password);
+    } catch (error) {
+      setSigningIn(false);
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Sign in failed. Please try again.';
+
+      setError(message);
+    }
+
+    // SessionProvider will update screen.
+  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -142,11 +176,19 @@ export default function SignInRoute() {
                 accessibilityRole="button"
                 onPressIn={pressIn}
                 onPressOut={pressOut}
+                onPress={signInPressed}
+                disabled={signingIn}
                 style={s.enterBtn}
               >
-                <Text style={s.enterBtnText}>Sign In →</Text>
+                {signingIn ? (
+                  <Spinner label="Preparing your session" />
+                ) : (
+                  <Text style={s.enterBtnText}>Sign In →</Text>
+                )}
               </Pressable>
             </Animated.View>
+
+            {error && <InlineError message={error} />}
 
             <View style={s.signupRow}>
               <Text style={s.signupHint}>New here? </Text>
