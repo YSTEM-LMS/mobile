@@ -15,6 +15,8 @@ import {
   spacing,
 } from '@/design/tokens';
 import { useSession } from '@/providers/SessionProvider';
+import { useState } from 'react';
+import { InlineError } from '@/components/feedback/InlineError';
 
 type Badge = {
   id: string;
@@ -139,6 +141,21 @@ export default function ProfileRoute() {
     session.status === 'authenticated' ? session.user.role : 'student';
   const initial = displayName.charAt(0).toUpperCase();
   const earnedCount = BADGES.filter((b) => b.earned).length;
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState('');
+
+  const signOutPressed = async () => {
+    setSigningOut(true);
+
+    try {
+      await signOut();
+    } catch (error) {
+      setSigningOut(false);
+      const message = error instanceof Error ? error.message : 'Sign out failed. Please try again.';
+      setError(message);
+    }
+   
+  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -258,7 +275,8 @@ export default function ProfileRoute() {
         <Pressable
           accessibilityLabel="Sign out"
           accessibilityRole="button"
-          onPress={signOut}
+          onPress={signOutPressed}
+          disabled={signingOut}
           style={({ pressed }) => [
             s.signOutBtn,
             pressed && s.signOutBtnPressed,
@@ -266,6 +284,8 @@ export default function ProfileRoute() {
         >
           <Text style={s.signOutText}>Sign out</Text>
         </Pressable>
+
+         {error && <InlineError message={error} />}
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
