@@ -15,15 +15,17 @@ import {
   type UserRole,
 } from '@/state/session';
 
-import { tokenStore } from '@/features/auth/secureStore';
+import { tokenStore } from '@/services/storage/TokenStore';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { authGateway } from '@/services/auth/AuthGateway';
 
 type SessionContextValue = {
   session: SessionState;
   mockSignInAs: (role: UserRole) => void;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  expiredSession: () => Promise<void>;
   restoreSession: () => Promise<void>;
 };
 
@@ -40,28 +42,7 @@ const mockUsers: Record<UserRole, SessionUser> = {
   },
 };
 
-// FAKE GATEWAY
-interface AuthGateway {
-  login: (username: string, password: string) => Promise<string>;
-  validate: (token: string) => Promise<boolean>;
-}
 
-const authGateway: AuthGateway = {
-  async login(username: string, password: string): Promise<string> {
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 1000);
-    });
-
-    return 'token123';
-  },
-  async validate(token: string): Promise<boolean> {
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 1000);
-    });
-
-    return true;
-  },
-};
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
@@ -75,8 +56,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     restoreSession();
   }, []);
-  
+
   const restoreRef = useRef(false);
+
   async function restoreSession(): Promise<void> {
     // This prevents a user from pressing on the retry button multiple times.
     // Which will cause this function to run multiple times.
@@ -86,7 +68,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     restoreRef.current = true;
 
-    dispatch({ type: 'launchRestore'})
+    dispatch({ type: 'launchRestore' });
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 2000);
     });
@@ -97,25 +79,19 @@ export function SessionProvider({ children }: PropsWithChildren) {
       if (token) {
         const validToken = await authGateway.validate(token);
 
-        // for now mock role
-        const role = 'student';
-
         if (validToken) {
+          // for now mock role
+          const role = 'student';
           dispatch({
             type: 'authenticated',
             user: mockUsers[role],
           });
         } else {
-          // token is invalid. Make an expired token state
-
-          // Delete the expired token
-          await tokenStore.deleteToken();
-
-          // For now just make state anonymous
-          dispatch({ type: 'bootstrapCompleted' });
+          // token is invalid. Session state is expired
+          await expiredSession();
         }
       } else {
-        // There is no saveed token so state is anonymous
+        // There is no saved token / previous session so state is anonymous
         dispatch({ type: 'anonymous' });
       }
     } catch (error) {
@@ -142,13 +118,43 @@ export function SessionProvider({ children }: PropsWithChildren) {
     });
   }
 
+  // This function will get called if there is a 401 response meaning the token is expired.
+  // Or if the token expired when the app was first launched
+  // use ref incase multiple 401 responses happens and expiredSession gets called multiple times.
+
+  const expiringRef = useRef(false);
+  async function expiredSession() {
+    if (expiringRef.current) {
+      return;
+    }
+
+    expiringRef.current = true;
+
+    // This ensures if deleteToken fails cancelQueries still gets called
+    try {
+      await Promise.allSettled([
+        tokenStore.deleteToken(),
+        queryClient.cancelQueries(),
+      ]);
+
+      queryClient.clear();
+
+      dispatch({
+        type: 'expired',
+        expiredMessage: 'Your session has expired. Please sign in again.',
+      });
+    } finally {
+      expiringRef.current = false;
+    }
+  }
+
   async function signIn(username: string, password: string): Promise<void> {
     try {
       const token = await authGateway.login(username, password);
 
       if (!token) {
         // Empty token recieved
-        throw new Error('Invalid token. Please try again.');
+        throw new Error('Invalid credentials. Please try again.');
       }
 
       // Validate token
@@ -203,6 +209,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
         mockSignInAs,
         signIn,
         signOut,
+        expiredSession,
         restoreSession,
       }}
     >
