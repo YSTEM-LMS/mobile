@@ -8,6 +8,8 @@ import { QueryProvider } from '@/providers/QueryProvider';
 
 import '@/config/env';
 
+import LaunchError from '@/features/auth/components/launch-error';
+
 export default function RootLayout() {
   return (
     <QueryProvider>
@@ -20,7 +22,7 @@ export default function RootLayout() {
 }
 
 function RootNavigator() {
-  const { session } = useSession();
+  const { session, restoreSession, signOut } = useSession();
 
   if (session.status === 'bootstrapping') {
     return (
@@ -30,9 +32,31 @@ function RootNavigator() {
     );
   }
 
+  // If an error occured on launch while checking if a user has a session.
+  if (session.status === 'error') {
+    // Get error message from session
+    const message = session.errorMessage;
+    return (
+      <Screen
+        background="patterned"
+        centered
+        testID="session-bootstrap-screen" // change this
+        contentStyle={{ gap: 16 }}
+      >
+        <LaunchError
+          message={message}
+          restoreSession={restoreSession}
+          signOut={signOut}
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={session.status === 'anonymous'}>
+      <Stack.Protected
+        guard={session.status === 'anonymous' || session.status === 'expired'}
+      >
         <Stack.Screen name="(public)" />
       </Stack.Protected>
 
