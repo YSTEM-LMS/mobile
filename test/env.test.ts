@@ -1,5 +1,7 @@
 import { EnvironmentConfigError, parsePublicEnvironment } from '@/config/env';
 
+const stockfishSocketUrl = 'https://stockfish.example.org';
+
 describe('parsePublicEnvironment', () => {
   it.each(['development', 'preview', 'production'] as const)(
     'accepts a valid %s environment',
@@ -8,10 +10,12 @@ describe('parsePublicEnvironment', () => {
         parsePublicEnvironment({
           appEnv,
           apiBaseUrl: 'https://api.example.org/v1/',
+          stockfishSocketUrl,
         }),
       ).toEqual({
         appEnv,
         apiBaseUrl: 'https://api.example.org/v1',
+        stockfishSocketUrl,
       });
     },
   );
@@ -21,10 +25,12 @@ describe('parsePublicEnvironment', () => {
       parsePublicEnvironment({
         appEnv: 'development',
         apiBaseUrl: 'http://10.0.2.2:8000',
+        stockfishSocketUrl: 'http://10.0.2.2:8080',
       }),
     ).toEqual({
       appEnv: 'development',
       apiBaseUrl: 'http://10.0.2.2:8000',
+      stockfishSocketUrl: 'http://10.0.2.2:8080',
     });
   });
 
@@ -35,6 +41,7 @@ describe('parsePublicEnvironment', () => {
         parsePublicEnvironment({
           appEnv,
           apiBaseUrl: 'http://api.example.org',
+          stockfishSocketUrl,
         }),
       ).toThrow('apiBaseUrl must use HTTPS outside development');
     },
@@ -55,6 +62,7 @@ describe('parsePublicEnvironment', () => {
       parsePublicEnvironment({
         appEnv: 'development',
         apiBaseUrl: 'https://user:password@api.example.org',
+        stockfishSocketUrl,
       }),
     ).toThrow('apiBaseUrl must not contain credentials');
   });
@@ -64,6 +72,7 @@ describe('parsePublicEnvironment', () => {
       parsePublicEnvironment({
         appEnv: 'development',
         apiBaseUrl: 'ftp://api.example.org',
+        stockfishSocketUrl,
       }),
     ).toThrow('apiBaseUrl must use HTTP or HTTPS');
   });
@@ -73,7 +82,37 @@ describe('parsePublicEnvironment', () => {
       parsePublicEnvironment({
         appEnv: 'development',
         apiBaseUrl: 'https://api.example.org?token=public#section',
+        stockfishSocketUrl,
       }),
     ).toThrow('apiBaseUrl must not contain a query string or fragment');
+  });
+
+  it('accepts and normalizes the Stockfish socket URL', () => {
+    expect(
+      parsePublicEnvironment({
+        appEnv: 'development',
+        apiBaseUrl: 'http://10.0.2.2:8000',
+        stockfishSocketUrl: 'http://10.0.2.2:8080/',
+      }).stockfishSocketUrl,
+    ).toBe('http://10.0.2.2:8080');
+  });
+
+  it('rejects a missing Stockfish socket URL', () => {
+    expect(() =>
+      parsePublicEnvironment({
+        appEnv: 'development',
+        apiBaseUrl: 'http://10.0.2.2:8000',
+      }),
+    ).toThrow('stockfishSocketUrl');
+  });
+
+  it('rejects an HTTP Stockfish socket URL in production', () => {
+    expect(() =>
+      parsePublicEnvironment({
+        appEnv: 'production',
+        apiBaseUrl: 'https://api.example.org',
+        stockfishSocketUrl: 'http://stockfish.example.org',
+      }),
+    ).toThrow('stockfishSocketUrl must use HTTPS outside development');
   });
 });
