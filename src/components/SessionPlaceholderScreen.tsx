@@ -1,5 +1,4 @@
 import type { PropsWithChildren } from 'react';
-
 import { PlaceholderScreen } from '@/components/PlaceholderScreen';
 import { useSession } from '@/providers/SessionProvider';
 
