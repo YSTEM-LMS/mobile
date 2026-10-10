@@ -1,14 +1,14 @@
-
-import { useState } from "react";
-import { Chess, Square } from "chess.js";
+import { useState } from 'react';
+import { Chess, Square } from 'chess.js';
 
 export function useChessGame(initialFen: string) {
   const [position, setPosition] = useState(initialFen);
-   const [lastMove, setLastMove] = useState<{
+  const [lastMove, setLastMove] = useState<{
     from: Square;
     to: Square;
   } | null>(null);
 
+  /*handles the move made by the player, updates the position and lastMove state, and logs the move to the console */
   const handleMove = (from: Square, to: Square) => {
     try {
       const game = new Chess(position);
@@ -29,7 +29,7 @@ export function useChessGame(initialFen: string) {
 
       return nextPosition;
     } catch (error) {
-      console.log("Invalid move:", error);
+      console.log('Invalid move:', error);
       return null;
     }
   };

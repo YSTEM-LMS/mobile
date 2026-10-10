@@ -25,11 +25,10 @@ import {
   spacing,
 } from '@/design/tokens';
 
+/* Chess Game imports */
 import { useChessGame } from '@/components/chess/useChessGame';
 import { ChessBoard_component } from '@/components/chess/Chessboard-component';
-
-const STARTING_FEN =
-  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 /*INVALID FEN: "wrong fen lmao"; */
 
@@ -52,64 +51,6 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   hard: '😤 Hard',
   master: '👑 Master',
 };
-
-
-/* function ChessBoard({ playerColor }: { playerColor: string }) {
-  const files =
-    playerColor === 'white'
-      ? ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-      : ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'];
-  const ranks =
-    playerColor === 'white'
-      ? [8, 7, 6, 5, 4, 3, 2, 1]
-      : [1, 2, 3, 4, 5, 6, 7, 8];
-  const coords =
-    playerColor === 'white'
-      ? ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-      : ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'];
-  return (
-    <View style={b.wrap}>
-      
-      <View style={b.rankLabels}>
-        {ranks.map((r) => (
-          <Text key={r} style={b.rankLabel}>
-            {r}
-          </Text>
-        ))}
-      </View>
-      <View style={{ flex: 1 }}>
-        {ranks.map((rank) => (
-          <View key={rank} style={b.row}>
-            {files.map((file, fi) => {
-              const isHl =
-                (file === 'e' && rank === 4) || (file === 'e' && rank === 5);
-              return (
-                <View
-                  key={file + rank}
-                  style={[
-                    b.square,
-                    (fi + rank) % 2 === 0 ? b.light : b.dark,
-                    isHl && b.highlighted,
-                  ]}
-                />
-              );
-            })}
-          </View>
-        ))}
-
-        <View style={b.fileRow}>
-          {coords.map((f) => (
-            <Text key={f} style={b.fileLabel}>
-              {f}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-} */
-
-
 
 function PlayerRow({
   label,
@@ -253,7 +194,7 @@ export default function PlayGameRoute() {
 
   const diffLabel = DIFFICULTY_LABEL[difficulty as string] ?? difficulty;
 
-const { position, lastMove, handleMove } = useChessGame(STARTING_FEN);
+  const { position, lastMove, handleMove } = useChessGame(STARTING_FEN);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -440,36 +381,6 @@ const { position, lastMove, handleMove } = useChessGame(STARTING_FEN);
     </SafeAreaView>
   );
 }
-
-/* ── Board styles ────────────────────────── */
-const b = StyleSheet.create({
-  wrap: { width: '100%', aspectRatio: 1, flexDirection: 'row' },
-  rankLabels: {
-    justifyContent: 'space-around',
-    paddingRight: 4,
-    paddingBottom: 18,
-  },
-  rankLabel: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-  row: { flex: 1, flexDirection: 'row' },
-  square: { flex: 1 },
-  light: { backgroundColor: '#F0D9B5' },
-  dark: { backgroundColor: '#B58863' },
-  highlighted: { backgroundColor: 'rgba(127,204,38,0.5)' },
-  fileRow: { flexDirection: 'row', height: 18 },
-  fileLabel: {
-    flex: 1,
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.5)',
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    paddingTop: 4,
-  },
-});
 
 /* ── Player row styles ───────────────────── */
 const p = StyleSheet.create({
