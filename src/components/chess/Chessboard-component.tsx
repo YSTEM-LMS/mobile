@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Chess, Square } from 'chess.js';
-import {
-  fontSizes,
-  fontWeights,
-  radii,
-  spacing,
-} from '@/design/tokens';
+import { fontSizes, fontWeights, radii, spacing } from '@/design/tokens';
 
 type ChessBoardProps = {
   fen: string;
