@@ -31,7 +31,7 @@ import { ChessBoard_component } from '@/components/chess/Chessboard-component';
 const STARTING_FEN =
   "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-
+/*INVALID FEN: "wrong fen lmao"; */
 
 type GameResult = 'win' | 'lose' | 'draw' | null;
 
@@ -253,7 +253,7 @@ export default function PlayGameRoute() {
 
   const diffLabel = DIFFICULTY_LABEL[difficulty as string] ?? difficulty;
 
-  const { position, handleMove } = useChessGame(STARTING_FEN);
+const { position, lastMove, handleMove } = useChessGame(STARTING_FEN);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -298,6 +298,8 @@ export default function PlayGameRoute() {
             orientation={color === 'white' ? 'white' : 'black'}
             disabled={false}
             onMove={handleMove}
+            lastMove={lastMove ?? undefined}
+            labels={true}
           />
         </View>
 

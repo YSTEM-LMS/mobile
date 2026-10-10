@@ -20,6 +20,7 @@ type ChessBoardProps = {
     from: string;
     to: string;
   };
+  labels?: boolean;
   onMove?: (from: Square, to: Square) => void;
 };
 
@@ -37,6 +38,7 @@ export function ChessBoard_component({
   selectedSquare,
   showLegalMoves = true,
   lastMove,
+  labels = true,
   onMove,
 }: ChessBoardProps) {
   const [internalSelectedSquare, setInternalSelectedSquare] =
@@ -119,9 +121,7 @@ export function ChessBoard_component({
   const pieceAt = (square: string) =>
     board.find((piece) => piece.square === square);
 
-  /*handles the logic for when a square is pressed, if the board is disabled or there is no game, it returns early, if a piece is already selected and the pressed square is a legal destination, it calls the onMove callback and clears the selection, 
-  if a piece is present on the pressed square and it is the correct turn, it sets the internal selected square to the pressed square, 
-  otherwise it clears the selection */
+  /*makes board playable or read-only*/ 
   const handleSquarePress = (square: Square) => {
     if (disabled || !game) {
       return;
@@ -151,10 +151,22 @@ export function ChessBoard_component({
     setInternalSelectedSquare(null);
   };
 
+  /*visable error when catching invalid fen */
+    if (!game) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>
+            Unable to display chessboard. Invalid FEN position.
+          </Text>
+        </View>
+      );
+}
+
   return (
     
     <View style={styles.wrap}>
       {/* Rank labels */}
+      {labels && (
     <View style={styles.rankLabels}>
       {ranks.map((rank) => (
         <Text key={rank} style={styles.rankLabel}>
@@ -162,6 +174,7 @@ export function ChessBoard_component({
         </Text>
       ))}
     </View>
+  )}
   {/* Actual board */}
 <View style={styles.boardContainer}>
     <View style={styles.board}>
@@ -223,6 +236,8 @@ export function ChessBoard_component({
       })}
     </View>
       {/* File labels */}
+
+    {labels && (  
     <View style={styles.fileRow}>
         {files.map((file) => (
           <Text key={file} style={styles.fileLabel}>
@@ -230,6 +245,7 @@ export function ChessBoard_component({
           </Text>
         ))}
       </View>
+      )}
     </View>
   </View>
   );
@@ -354,4 +370,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingTop: 4,
   },
+
+  errorContainer: {
+  width: "100%",
+  padding: spacing.md,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
+errorText: {
+  color: "red",
+  textAlign: "center",
+},
 });
