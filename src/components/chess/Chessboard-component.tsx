@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Chess, Square } from "chess.js";
+import {
+  fontSizes,
+  fontWeights,
+  palette,
+  radii,
+  spacing,
+} from '@/design/tokens';
 
 
 type ChessBoardProps = {
@@ -23,7 +30,7 @@ type Piece = {
 };
 
 /*main chessboard function  */
-export function ChessBoard({
+export function ChessBoard_component({
   fen,
   orientation = "white",
   disabled = false,
@@ -145,6 +152,18 @@ export function ChessBoard({
   };
 
   return (
+    
+    <View style={styles.wrap}>
+      {/* Rank labels */}
+    <View style={styles.rankLabels}>
+      {ranks.map((rank) => (
+        <Text key={rank} style={styles.rankLabel}>
+          {rank}
+        </Text>
+      ))}
+    </View>
+  {/* Actual board */}
+<View style={styles.boardContainer}>
     <View style={styles.board}>
       {squares.map((square, index) => {
         const row = Math.floor(index / 8);
@@ -203,6 +222,16 @@ export function ChessBoard({
         );
       })}
     </View>
+      {/* File labels */}
+    <View style={styles.fileRow}>
+        {files.map((file) => (
+          <Text key={file} style={styles.fileLabel}>
+            {file}
+          </Text>
+        ))}
+      </View>
+    </View>
+  </View>
   );
 }
 
@@ -235,13 +264,36 @@ function getPieceSymbol(
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    width: "100%",
+    //aspectRatio: 1,
+    flexDirection: "row",
+  },
+
+  rankLabels: {
+    justifyContent: "space-around",
+    paddingRight: 4,
+    paddingBottom: 18,
+  },
+
+  rankLabel: {
+    fontSize: 9,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: fontWeights.bold,
+    textAlign: "center",
+  },
+
+  boardContainer: {
+    flex: 1,
+  },
+
   board: {
     width: "100%",
     aspectRatio: 1,
     flexDirection: "row",
     flexWrap: "wrap",
     overflow: "hidden",
-    borderRadius: 12,
+    borderRadius: radii.md,
   },
 
   square: {
@@ -268,7 +320,7 @@ const styles = StyleSheet.create({
   },
 
   piece: {
-    fontSize: 40,
+    fontSize: fontSizes.display,
     lineHeight: 48,
   },
 
@@ -286,5 +338,20 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
     backgroundColor: "rgba(0, 0, 0, 0.35)",
+  },
+
+  fileRow: {
+    width: "100%",
+    flexDirection: "row",
+    height: 18,
+  },
+
+  fileLabel: {
+    flex: 1,
+    fontSize: 9,
+    color: "rgba(255,255,255,0.5)",
+    fontWeight: fontWeights.bold,
+    textAlign: "center",
+    paddingTop: 4,
   },
 });

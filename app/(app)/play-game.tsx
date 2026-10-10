@@ -25,6 +25,14 @@ import {
   spacing,
 } from '@/design/tokens';
 
+import { useChessGame } from '@/components/chess/useChessGame';
+import { ChessBoard_component } from '@/components/chess/Chessboard-component';
+
+const STARTING_FEN =
+  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+
+
 type GameResult = 'win' | 'lose' | 'draw' | null;
 
 const MOVES = [
@@ -45,7 +53,8 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   master: '👑 Master',
 };
 
-function ChessBoard({ playerColor }: { playerColor: string }) {
+
+/* function ChessBoard({ playerColor }: { playerColor: string }) {
   const files =
     playerColor === 'white'
       ? ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -58,10 +67,9 @@ function ChessBoard({ playerColor }: { playerColor: string }) {
     playerColor === 'white'
       ? ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
       : ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'];
-
   return (
     <View style={b.wrap}>
-      {/* Rank labels */}
+      
       <View style={b.rankLabels}>
         {ranks.map((r) => (
           <Text key={r} style={b.rankLabel}>
@@ -88,7 +96,7 @@ function ChessBoard({ playerColor }: { playerColor: string }) {
             })}
           </View>
         ))}
-        {/* File labels */}
+
         <View style={b.fileRow}>
           {coords.map((f) => (
             <Text key={f} style={b.fileLabel}>
@@ -99,7 +107,9 @@ function ChessBoard({ playerColor }: { playerColor: string }) {
       </View>
     </View>
   );
-}
+} */
+
+
 
 function PlayerRow({
   label,
@@ -243,6 +253,8 @@ export default function PlayGameRoute() {
 
   const diffLabel = DIFFICULTY_LABEL[difficulty as string] ?? difficulty;
 
+  const { position, handleMove } = useChessGame(STARTING_FEN);
+
   return (
     <SafeAreaView style={s.safe}>
       {/* ── Dark Header ────────────────────────── */}
@@ -281,7 +293,12 @@ export default function PlayGameRoute() {
 
         {/* ── Board ──────────────────────────────── */}
         <View style={s.boardWrap}>
-          <ChessBoard playerColor={color as string} />
+          <ChessBoard_component
+            fen={position}
+            orientation={color === 'white' ? 'white' : 'black'}
+            disabled={false}
+            onMove={handleMove}
+          />
         </View>
 
         {/* ── Player Row ─────────────────────────── */}
