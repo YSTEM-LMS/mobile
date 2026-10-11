@@ -30,6 +30,9 @@ import {
 import { useSession } from '@/providers/SessionProvider';
 import { Spinner } from '@/components/ui/Spinner';
 import { InlineError } from '@/components/feedback/InlineError';
+import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
+import { isNonEmptyString } from '@/utils/isNonEmptyString';
+import { AppError } from '@/services/api/apiError';
 
 const chessPiecePattern = require('@/assets/images/chess-piece-pattern.png');
 
@@ -41,8 +44,10 @@ export default function SignInRoute() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
-
-  const [error, setError] = useState(session.status === 'expired' ? session.expiredMessage : '');
+  const [error, setError] = useState(
+    session.status === 'expired' ? session.expiredMessage : '',
+  );
+  const [connectionError, setConnectionError] = useState('');
 
   const [btnScale] = useState(() => new Animated.Value(1));
   const pressIn = () =>
@@ -61,13 +66,13 @@ export default function SignInRoute() {
     }).start();
 
   const signInPressed = async () => {
-    setError('')
+    setError('');
+    setConnectionError('');
     setSigningIn(true);
 
-    if (!username || !password) {
+    if (!isNonEmptyString(username) || !isNonEmptyString(password)) {
       setSigningIn(false);
 
-      // Show invalid-credentials message
       setError('Please enter your username and password');
 
       return;
@@ -77,15 +82,22 @@ export default function SignInRoute() {
       await signIn(username, password);
     } catch (error) {
       setSigningIn(false);
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Sign in failed. Please try again.';
-
-      setError(message);
+      if (error instanceof AppError) {
+        switch (error.code) {
+          case 'NETWORK_ERROR':
+            setConnectionError(error.message);
+            break;
+          case 'REQUEST_TIMEOUT':
+            setConnectionError(error.message);
+            break;
+          default:
+            setError(error.message);
+            break;
+        }
+      } else {
+        setError('Sign in failed. Please try again.');
+      }
     }
-
-    // SessionProvider will update screen.
   };
 
   return (
@@ -128,6 +140,7 @@ export default function SignInRoute() {
               <View style={[s.field, usernameFocused && s.fieldFocused]}>
                 <Text style={s.fieldIcon}>👤</Text>
                 <TextInput
+                testID="username-input"
                   autoCapitalize="none"
                   autoCorrect={false}
                   onBlur={() => setUsernameFocused(false)}
@@ -144,6 +157,7 @@ export default function SignInRoute() {
               <View style={[s.field, passwordFocused && s.fieldFocused]}>
                 <Text style={s.fieldIcon}>🔒</Text>
                 <TextInput
+                  testID="password-input"
                   autoCapitalize="none"
                   autoCorrect={false}
                   onBlur={() => setPasswordFocused(false)}
@@ -181,7 +195,7 @@ export default function SignInRoute() {
                 style={s.enterBtn}
               >
                 {signingIn ? (
-                  <Spinner label="Preparing your session" />
+                  <Spinner label="Signing In" />
                 ) : (
                   <Text style={s.enterBtnText}>Sign In →</Text>
                 )}
@@ -190,6 +204,9 @@ export default function SignInRoute() {
 
             {error && <InlineError message={error} />}
 
+            {connectionError && (
+              <ConnectionBanner message={connectionError} status="offline" />
+            )}
             <View style={s.signupRow}>
               <Text style={s.signupHint}>New here? </Text>
               <Pressable hitSlop={8}>
