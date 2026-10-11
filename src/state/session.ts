@@ -1,7 +1,7 @@
 export type UserRole = 'student' | 'mentor';
 
 export type SessionUser = {
-  readonly id: string;
+  readonly username: string;
   readonly displayName: string;
   readonly role: UserRole;
 };
@@ -16,6 +16,14 @@ export type SessionState =
   | {
       readonly status: 'authenticated';
       readonly user: SessionUser;
+    }
+  | {
+      readonly status: 'expired';
+      readonly expiredMessage: string;
+    }
+  | {
+      readonly status: 'error';
+      readonly errorMessage: string;
     };
 
 export type SessionAction =
@@ -28,6 +36,20 @@ export type SessionAction =
     }
   | {
       readonly type: 'signedOut';
+    }
+  | {
+      readonly type: 'anonymous';
+    }
+  | {
+      readonly type: 'error';
+      readonly errorMessage: string;
+    }
+  | {
+      readonly type: 'restore';
+    }
+  | {
+      readonly type: 'expired';
+      readonly expiredMessage: string;
     };
 
 export const initialSessionState: SessionState = {
@@ -48,6 +70,18 @@ export function sessionReducer(
       };
     case 'signedOut':
       return state.status === 'anonymous' ? state : { status: 'anonymous' };
+    case 'anonymous':
+      return { status: 'anonymous' };
+    case 'expired':
+      return { status: 'expired', expiredMessage: action.expiredMessage };
+    case 'error':
+      return {
+        status: 'error',
+        errorMessage: action.errorMessage,
+      };
+    case 'restore':
+      return { status: 'bootstrapping' };
+
     default: {
       const exhaustiveAction: never = action;
       return exhaustiveAction;

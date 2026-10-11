@@ -5,7 +5,7 @@ import {
 } from '@/state/session';
 
 const student: SessionUser = {
-  id: 'test-student',
+  username: 'test-student',
   displayName: 'Test Student',
   role: 'student',
 };
