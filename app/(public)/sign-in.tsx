@@ -32,7 +32,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { InlineError } from '@/components/feedback/InlineError';
 import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
 import { isNonEmptyString } from '@/utils/isNonEmptyString';
-import { AppError } from '@/services/api/apiError';
+// Temporary AppError import until API is merged
+import { AppError } from '@/services/storage/TokenStore';
 
 const chessPiecePattern = require('@/assets/images/chess-piece-pattern.png');
 

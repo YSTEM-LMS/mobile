@@ -17,9 +17,10 @@ import {
 import { useSession } from '@/providers/SessionProvider';
 import { useState } from 'react';
 import { InlineError } from '@/components/feedback/InlineError';
-import { AppError } from '@/services/api/apiError';
 import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
 import { Spinner } from '@/components/ui/Spinner';
+// Temporary AppError import until API is merged
+import { AppError } from '@/services/storage/TokenStore';
 
 type Badge = {
   id: string;

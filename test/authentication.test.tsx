@@ -10,12 +10,13 @@ import { render } from '@testing-library/react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Button, Text, View } from 'react-native';
 
-import { AppError } from '@/services/api/apiError';
 import { authGateway } from '@/services/auth/AuthGateway';
 import { tokenStore } from '@/services/storage/TokenStore';
 import { createQueryClient } from '@/providers/QueryProvider';
 import { SessionProvider, useSession } from '@/providers/SessionProvider';
 import { renderAnonymous } from './fixtures/renderAnonymous';
+// Temporary AppError import until API is merged
+import { AppError } from '@/services/storage/TokenStore';
 
 const studentToken =
   'eyJ0eXAiOiJKV1QifQ.eyJ1c2VybmFtZSI6InRlc3Qtc3R1ZGVudCIsImZpcnN0TmFtZSI6IlRlc3QiLCJsYXN0TmFtZSI6IlN0dWRlbnQiLCJyb2xlIjoic3R1ZGVudCJ9.fake';

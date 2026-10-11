@@ -15,11 +15,15 @@ import {
   type UserRole,
 } from '@/state/session';
 
-import { tokenStore } from '@/services/storage/TokenStore';
+// Temporary AppError import until API is merged
+import { AppError, tokenStore } from '@/services/storage/TokenStore';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { authGateway } from '@/services/auth/AuthGateway';
-import { AppError } from '@/services/api/apiError';
+import {
+  authGateway,
+  studentToken,
+  mentorToken,
+} from '@/services/auth/AuthGateway';
 import { decodeJWT } from '@/services/auth/decodeJWT';
 import type { AuthGateway } from '@/types/authGateway';
 
@@ -31,12 +35,6 @@ type SessionContextValue = {
   expiredSession: () => Promise<void>;
   restoreSession: () => Promise<void>;
 };
-
-export const studentToken =
-  'eyJ0eXAiOiJKV1QifQ.eyJ1c2VybmFtZSI6Im1vY2stc3R1ZGVudCIsImZpcnN0TmFtZSI6Ik1vY2siLCJsYXN0TmFtZSI6IlN0dWRlbnQiLCJyb2xlIjoic3R1ZGVudCJ9.fake';
-
-export const mentorToken =
-  'eyJ0eXAiOiJKV1QifQ.eyJ1c2VybmFtZSI6Im1vY2stbWVudG9yIiwiZmlyc3ROYW1lIjoiTW9jayIsImxhc3ROYW1lIjoiTWVudG9yIiwicm9sZSI6Im1lbnRvciJ9.fake';
 
 const fakeAuthGateway: AuthGateway = {
   async login(username) {
