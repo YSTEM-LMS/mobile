@@ -61,7 +61,7 @@ describe('SessionProvider', () => {
       }),
     );
 
-    expect(screen.getByText('authenticated')).toBeOnTheScreen();
+    expect(await screen.findByText('authenticated')).toBeOnTheScreen();
 
     expect(screen.getByText('student')).toBeOnTheScreen();
 
@@ -91,6 +91,6 @@ describe('SessionProvider', () => {
       }),
     );
 
-    expect(screen.getByText('mentor')).toBeOnTheScreen();
+    expect(await screen.findByText('mentor')).toBeOnTheScreen();
   });
 });

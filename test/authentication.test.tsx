@@ -226,7 +226,7 @@ describe('authentication', () => {
 
     await screen.findByText('anonymous');
     fireEvent.press(screen.getByRole('button', { name: 'Mock student' }));
-    expect(screen.getByText('authenticated')).toBeOnTheScreen();
+    expect(await screen.findByText('authenticated')).toBeOnTheScreen();
     queryClient.setQueryData(privateKey, { name: 'Test Student' });
     expect(queryClient.getQueryData(privateKey)).toBeDefined();
     fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));

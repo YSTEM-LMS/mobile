@@ -7,17 +7,7 @@ import {
   waitFor,
 } from 'expo-router/testing-library';
 
-async function renderAnonymous(initialUrl = '/') {
-  const renderedRouter = renderRouter('./app', {
-    initialUrl,
-  });
-
-  await waitFor(() => {
-    expect(screen.getByText('Welcome back')).toBeOnTheScreen();
-  });
-
-  return renderedRouter;
-}
+import { renderAnonymous } from './fixtures/renderAnonymous';
 
 describe('session-aware navigation', () => {
   it('redirects an anonymous user away from a protected route', async () => {

@@ -1,0 +1,2 @@
+export const studentToken =
+  'eyJ0eXAiOiJKV1QifQ.eyJpZCI6IjEyMyIsImRpc3BsYXlOYW1lIjoiVGVzdCBTdHVkZW50Iiwicm9sZSI6InN0dWRlbnQifQ.fake';
