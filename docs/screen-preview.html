@@ -1,0 +1,2717 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Y STEM and Chess — Mobile Screen Preview</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #1a1a1a;
+        --green: #7fcc26;
+        --greenSoft: #bfd99e;
+        --greenBg: #e5f3d2;
+        --yellow: #ead94c;
+        --surface: #ffffff;
+        --bg: #f9faf7;
+        --muted: #8a8a8a;
+        --gray: #5c5c5c;
+        --border: #e4e4e7;
+        --error: #d64545;
+        --errorBg: #f5e9e9;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+        background: #0f0f0f;
+        color: #fff;
+        padding: 40px 24px 80px;
+        min-height: 100vh;
+      }
+
+      /* ── Page header ───────────────────────────── */
+      .page-header {
+        text-align: center;
+        margin-bottom: 64px;
+      }
+      .page-header h1 {
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: #fff;
+      }
+      .page-header h1 span {
+        color: var(--green);
+      }
+      .page-header p {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #777;
+      }
+      .tag {
+        display: inline-block;
+        margin-top: 12px;
+        background: #1c1c1c;
+        border: 1px solid #333;
+        border-radius: 100px;
+        padding: 4px 14px;
+        font-size: 11px;
+        color: #888;
+        letter-spacing: 0.5px;
+      }
+
+      /* ── Section headers ───────────────────────── */
+      .section-title {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #555;
+        margin: 64px 0 28px;
+        text-align: center;
+      }
+
+      /* ── Scroll row of phones ──────────────────── */
+      .phones-row {
+        display: flex;
+        gap: 28px;
+        overflow-x: auto;
+        padding-bottom: 16px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #333 transparent;
+      }
+      .phones-row::-webkit-scrollbar {
+        height: 4px;
+      }
+      .phones-row::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .phones-row::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 4px;
+      }
+
+      /* ── Phone frame ───────────────────────────── */
+      .phone-wrap {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+      }
+      .phone-label {
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: #555;
+      }
+      .phone {
+        width: 280px;
+        height: 600px;
+        background: var(--bg);
+        border-radius: 40px;
+        border: 6px solid #2a2a2a;
+        overflow: hidden;
+        position: relative;
+        box-shadow:
+          0 0 0 1px #000,
+          0 30px 60px rgba(0, 0, 0, 0.6),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+      }
+      .phone::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 28px;
+        background: #2a2a2a;
+        border-radius: 0 0 20px 20px;
+        z-index: 10;
+      }
+
+      /* ── Screen content helpers ────────────────── */
+      .screen {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        font-size: 10px;
+      }
+      .screen-bg {
+        background: var(--bg);
+      }
+      .screen-dark {
+        background: var(--ink);
+      }
+
+      /* ── Sign In ─────────────────────────────── */
+      .signin-pattern {
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          45deg,
+          rgba(127, 204, 38, 0.04) 0px,
+          rgba(127, 204, 38, 0.04) 1px,
+          transparent 1px,
+          transparent 28px
+        );
+      }
+      .signin-card {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--surface);
+        border-radius: 28px 28px 0 0;
+        padding: 24px 20px 28px;
+        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.08);
+      }
+      .signin-logo {
+        text-align: center;
+        margin-bottom: 20px;
+        margin-top: 8px;
+      }
+      .signin-logo .logo-circle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: var(--ink);
+        font-size: 22px;
+        margin-bottom: 10px;
+      }
+      .signin-logo h1 {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .signin-logo p {
+        font-size: 9px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .field {
+        background: var(--bg);
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+      }
+      .field-label {
+        font-size: 8px;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .field-value {
+        font-size: 11px;
+        color: var(--ink);
+        margin-top: 2px;
+      }
+      .btn-primary-block {
+        background: var(--ink);
+        color: #fff;
+        border-radius: 100px;
+        padding: 12px;
+        text-align: center;
+        font-size: 11px;
+        font-weight: 700;
+        margin-top: 12px;
+      }
+      .signin-links {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 12px;
+      }
+      .link {
+        font-size: 9px;
+        color: var(--green);
+        font-weight: 600;
+      }
+
+      /* ── Misc helpers ────────────────────────── */
+      .status-bar {
+        height: 36px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        padding: 0 16px 6px;
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .status-bar.dark {
+        color: #fff;
+      }
+      .safe-top {
+        height: 36px;
+      }
+      .header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 16px 12px;
+      }
+      .header-sup {
+        font-size: 7px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--muted);
+      }
+      .header-title {
+        font-size: 17px;
+        font-weight: 800;
+        color: var(--ink);
+        letter-spacing: -0.3px;
+      }
+      .header-title.sm {
+        font-size: 14px;
+      }
+      .header-title.white {
+        color: #fff;
+      }
+      .section-pad {
+        padding: 0 16px;
+      }
+      .mt4 {
+        margin-top: 4px;
+      }
+      .mt8 {
+        margin-top: 8px;
+      }
+      .mt12 {
+        margin-top: 12px;
+      }
+      .mt16 {
+        margin-top: 16px;
+      }
+      .mb4 {
+        margin-bottom: 4px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .row-sb {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .col {
+        display: flex;
+        flex-direction: column;
+      }
+      .flex1 {
+        flex: 1;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 100px;
+        padding: 3px 8px;
+        font-size: 8px;
+        font-weight: 700;
+      }
+      .chip-green {
+        background: rgba(127, 204, 38, 0.15);
+        color: var(--green);
+      }
+      .chip-yellow {
+        background: rgba(234, 217, 76, 0.2);
+        color: #9a7e00;
+        border: 1px solid var(--yellow);
+      }
+      .chip-ink {
+        background: rgba(26, 26, 26, 0.08);
+        color: var(--ink);
+      }
+      .pill-btn {
+        background: var(--green);
+        color: var(--ink);
+        border-radius: 100px;
+        padding: 10px 16px;
+        text-align: center;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .card {
+        background: var(--surface);
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      }
+      .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 8px 0;
+      }
+
+      /* ── Home ─────────────────────────────────── */
+      .hero-card {
+        background: var(--ink);
+        border-radius: 20px;
+        padding: 16px;
+        margin: 0 16px;
+        color: #fff;
+      }
+      .hero-card .greeting {
+        font-size: 8px;
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .hero-card .name {
+        font-size: 14px;
+        font-weight: 800;
+        margin-top: 2px;
+      }
+      .hero-card .xp-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .hero-card .xp-num {
+        font-size: 20px;
+        font-weight: 800;
+      }
+      .xp-bar {
+        height: 3px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 2px;
+        margin-top: 8px;
+      }
+      .xp-fill {
+        height: 100%;
+        background: var(--green);
+        border-radius: 2px;
+      }
+      .hero-stats {
+        display: flex;
+        gap: 1px;
+        margin-top: 12px;
+      }
+      .hero-stat {
+        flex: 1;
+        text-align: center;
+      }
+      .hero-stat .val {
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+      }
+      .hero-stat .lbl {
+        font-size: 7px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: 1px;
+      }
+      .hero-stat + .hero-stat {
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 0 16px;
+      }
+      .action-card {
+        background: var(--surface);
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        padding: 12px;
+        position: relative;
+        overflow: hidden;
+      }
+      .action-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 3px;
+      }
+      .action-emoji {
+        font-size: 20px;
+        margin-bottom: 6px;
+        margin-left: 8px;
+      }
+      .action-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink);
+        margin-left: 8px;
+      }
+      .action-sub {
+        font-size: 8px;
+        color: var(--muted);
+        margin-left: 8px;
+        margin-top: 1px;
+      }
+
+      /* ── Tab bar ───────────────────────────────── */
+      .tab-bar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        display: flex;
+      }
+      .tab-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+      }
+      .tab-icon {
+        font-size: 18px;
+        opacity: 0.35;
+      }
+      .tab-icon.active {
+        opacity: 1;
+      }
+      .tab-lbl {
+        font-size: 7px;
+        color: var(--muted);
+      }
+      .tab-lbl.active {
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      /* ── Learn ─────────────────────────────────── */
+      .progress-bar {
+        height: 3px;
+        background: var(--border);
+        position: relative;
+      }
+      .progress-fill {
+        height: 100%;
+        background: var(--green);
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      .pieces-row {
+        display: flex;
+        gap: 8px;
+        padding: 0 16px;
+        overflow: hidden;
+      }
+      .piece-card {
+        flex: 0 0 auto;
+        width: 60px;
+        background: var(--surface);
+        border-radius: 12px;
+        border: 1.5px solid var(--border);
+        padding: 8px 4px;
+        text-align: center;
+      }
+      .piece-card.selected {
+        border-color: var(--green);
+        background: rgba(127, 204, 38, 0.05);
+      }
+      .piece-emoji {
+        font-size: 18px;
+        display: block;
+      }
+      .piece-name {
+        font-size: 7px;
+        color: var(--muted);
+        margin-top: 2px;
+        font-weight: 600;
+      }
+      .piece-prog {
+        height: 2px;
+        background: var(--border);
+        border-radius: 1px;
+        margin: 4px 4px 0;
+      }
+      .piece-fill {
+        height: 100%;
+        background: var(--green);
+        border-radius: 1px;
+      }
+      .lesson-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .lesson-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 10px;
+      }
+      .dot-done {
+        background: var(--green);
+        color: var(--ink);
+      }
+      .dot-available {
+        background: var(--ink);
+        color: #fff;
+      }
+      .dot-locked {
+        background: var(--border);
+        color: var(--muted);
+      }
+      .lesson-title {
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .lesson-meta {
+        font-size: 8px;
+        color: var(--muted);
+        margin-top: 1px;
+      }
+
+      /* ── Puzzles ───────────────────────────────── */
+      .chess-board {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        aspect-ratio: 1;
+        width: 100%;
+      }
+      .cell-light {
+        background: #f0d9b5;
+      }
+      .cell-dark {
+        background: #b58863;
+      }
+      .result-banner {
+        margin: 8px 16px 0;
+        background: rgba(127, 204, 38, 0.1);
+        border: 1px solid var(--green);
+        border-radius: 12px;
+        padding: 10px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .result-banner.wrong {
+        background: var(--errorBg);
+        border-color: var(--error);
+      }
+      .result-icon-lg {
+        font-size: 20px;
+      }
+      .result-title {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .result-sub {
+        font-size: 8px;
+        color: var(--muted);
+        margin-top: 1px;
+      }
+      .info-card {
+        margin: 8px 16px 0;
+      }
+      .rating-box {
+        background: var(--bg);
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        padding: 8px;
+        text-align: center;
+        width: 52px;
+        flex-shrink: 0;
+      }
+      .rating-lbl {
+        font-size: 7px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .rating-val {
+        font-size: 16px;
+        font-weight: 800;
+        color: var(--green);
+      }
+      .theme-pill {
+        background: rgba(127, 204, 38, 0.1);
+        border: 1px solid rgba(127, 204, 38, 0.25);
+        border-radius: 100px;
+        padding: 2px 8px;
+        font-size: 8px;
+        font-weight: 700;
+        color: var(--green);
+      }
+      .hint-btn {
+        background: rgba(234, 217, 76, 0.15);
+        border: 1px solid rgba(234, 217, 76, 0.5);
+        border-radius: 10px;
+        padding: 8px;
+        text-align: center;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--ink);
+        margin-top: 8px;
+      }
+
+      /* ── Play Setup ────────────────────────────── */
+      .color-row {
+        display: flex;
+        gap: 8px;
+        padding: 0 16px;
+      }
+      .color-card {
+        flex: 1;
+        border-radius: 16px;
+        border: 2px solid var(--border);
+        padding: 10px 8px;
+        text-align: center;
+      }
+      .color-card.selected {
+        border-color: var(--green);
+      }
+      .color-card .piece-lg {
+        font-size: 24px;
+        display: block;
+        margin-bottom: 4px;
+      }
+      .color-card .lbl {
+        font-size: 9px;
+        font-weight: 700;
+      }
+      .color-card .sub {
+        font-size: 7px;
+        color: var(--muted);
+      }
+      .color-white {
+        background: #fafafa;
+      }
+      .color-black {
+        background: #2a2a2a;
+      }
+      .color-black .lbl,
+      .color-black .sub {
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .color-rnd {
+        background: var(--greenBg);
+      }
+      .diff-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--surface);
+        border-radius: 12px;
+        border: 1.5px solid var(--border);
+        padding: 8px 10px;
+        margin: 0 16px 6px;
+        position: relative;
+        overflow: hidden;
+      }
+      .diff-row.selected {
+        border-color: var(--green);
+        background: rgba(127, 204, 38, 0.04);
+      }
+      .diff-accent {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+      }
+      .diff-info .lbl {
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .diff-info .desc {
+        font-size: 8px;
+        color: var(--muted);
+      }
+      .dots {
+        display: flex;
+        gap: 3px;
+        margin-left: auto;
+      }
+      .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+      }
+
+      /* ── Play Game ─────────────────────────────── */
+      .dark-header {
+        background: var(--ink);
+        padding: 8px 16px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-top: 36px;
+      }
+      .back-btn {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: #fff;
+      }
+      .player-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .player-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--green);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .player-name {
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .player-cap {
+        font-size: 8px;
+        color: var(--muted);
+      }
+      .timer {
+        margin-left: auto;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px 8px;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .timer.active {
+        background: var(--green);
+        border-color: var(--green);
+        color: var(--ink);
+      }
+      .tutor-card {
+        margin: 6px 12px 0;
+      }
+      .tutor-header {
+        background: rgba(234, 217, 76, 0.15);
+        padding: 6px 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 12px 12px 0 0;
+      }
+      .tutor-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 6px;
+        background: var(--yellow);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+      }
+      .tutor-title {
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--ink);
+        flex: 1;
+      }
+      .tutor-body {
+        background: var(--surface);
+        border-radius: 0 0 12px 12px;
+        border: 1px solid var(--border);
+        border-top: none;
+        padding: 8px 10px;
+      }
+      .opening-name {
+        font-size: 8px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+      .tutor-tip {
+        font-size: 8px;
+        color: var(--ink);
+        margin-top: 4px;
+        line-height: 1.4;
+      }
+      .move-history {
+        display: flex;
+        gap: 6px;
+        padding: 0 12px;
+        overflow: hidden;
+        margin-top: 8px;
+      }
+      .move-pair {
+        display: flex;
+        gap: 2px;
+      }
+      .move-chip {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-size: 8px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .dark-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--ink);
+        padding: 8px 12px 20px;
+        display: flex;
+        gap: 6px;
+      }
+      .ctrl-btn {
+        flex: 1;
+        text-align: center;
+        padding: 7px 4px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        font-size: 8px;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .ctrl-btn.danger {
+        background: rgba(214, 69, 69, 0.15);
+        color: #d64545;
+      }
+
+      /* ── Profile ───────────────────────────────── */
+      .avatar-ring {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(127, 204, 38, 0.2);
+        padding: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .avatar-inner {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: var(--green);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .stats-bar {
+        display: flex;
+        background: var(--surface);
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        margin: 0 16px;
+      }
+      .stat-cell {
+        flex: 1;
+        text-align: center;
+        padding: 10px 4px;
+      }
+      .stat-cell + .stat-cell {
+        border-left: 1px solid var(--border);
+      }
+      .stat-val {
+        font-size: 14px;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .stat-lbl {
+        font-size: 7px;
+        color: var(--muted);
+        margin-top: 1px;
+      }
+      .badge-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        padding: 0 16px;
+      }
+      .badge-card {
+        background: var(--surface);
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        padding: 8px 4px;
+        text-align: center;
+      }
+      .badge-card.locked {
+        opacity: 0.55;
+      }
+      .badge-emoji {
+        font-size: 18px;
+        display: block;
+      }
+      .badge-lbl {
+        font-size: 7px;
+        font-weight: 600;
+        color: var(--gray);
+        margin-top: 3px;
+      }
+      .menu-card {
+        background: var(--surface);
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        margin: 0 16px;
+        overflow: hidden;
+      }
+      .menu-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .menu-row:last-child {
+        border-bottom: none;
+      }
+      .menu-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+      .menu-lbl {
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .menu-sub {
+        font-size: 8px;
+        color: var(--muted);
+      }
+      .arrow {
+        margin-left: auto;
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      /* ── Lesson Detail ─────────────────────────── */
+      .step-dots {
+        display: flex;
+        gap: 4px;
+        padding: 8px 16px;
+      }
+      .step-dot {
+        height: 4px;
+        border-radius: 2px;
+        background: var(--border);
+      }
+      .step-dot.done {
+        background: var(--green);
+      }
+      .step-dot.active {
+        background: var(--green);
+        width: 16px;
+      }
+      .board-wrap {
+        margin: 8px 16px;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+      }
+      .instruction-card {
+        margin: 8px 16px;
+        background: var(--surface);
+        border-radius: 14px;
+        border: 1px solid var(--border);
+        padding: 12px;
+      }
+      .inst-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .piece-badge {
+        background: var(--ink);
+        color: #fff;
+        border-radius: 8px;
+        padding: 3px 8px;
+        font-size: 9px;
+        font-weight: 700;
+      }
+      .inst-text {
+        font-size: 9px;
+        color: var(--ink);
+        line-height: 1.5;
+      }
+      .tip-box {
+        background: rgba(234, 217, 76, 0.15);
+        border-left: 2px solid var(--yellow);
+        border-radius: 6px;
+        padding: 6px 8px;
+        margin-top: 8px;
+        font-size: 8px;
+        color: var(--ink);
+      }
+      .lesson-footer {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 10px 16px 20px;
+        background: var(--bg);
+        border-top: 1px solid var(--border);
+        display: flex;
+        gap: 8px;
+      }
+      .btn-secondary {
+        flex: 1;
+        border-radius: 100px;
+        border: 1.5px solid var(--border);
+        padding: 9px;
+        text-align: center;
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--ink);
+        background: var(--surface);
+      }
+      .btn-green-pill {
+        flex: 2;
+        background: var(--green);
+        border-radius: 100px;
+        padding: 9px;
+        text-align: center;
+        font-size: 9px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      /* ── Footer note ───────────────────────────── */
+      .footer-note {
+        text-align: center;
+        margin-top: 80px;
+        font-size: 11px;
+        color: #444;
+      }
+      .footer-note span {
+        color: var(--green);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ════════════════════════════════════════
+       PAGE HEADER
+  ════════════════════════════════════════ -->
+    <div class="page-header">
+      <h1>Y <span>STEM</span> and Chess</h1>
+      <p>Mobile App — All Screens</p>
+      <span class="tag">design/sandith-ui-screens · React Native + Expo</span>
+    </div>
+
+    <!-- ════════════════════════════════════════
+       D1 — AUTH
+  ════════════════════════════════════════ -->
+    <div class="section-title">D1 — Authentication</div>
+    <div class="phones-row">
+      <!-- Sign In -->
+      <div class="phone-wrap">
+        <div class="phone-label">Sign In</div>
+        <div class="phone">
+          <div class="screen">
+            <div class="signin-pattern"></div>
+            <!-- top space / hero -->
+            <div
+              style="
+                height: 140px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <div style="font-size: 48px">♟</div>
+            </div>
+            <div class="signin-card">
+              <div class="signin-logo">
+                <div class="logo-circle">♟</div>
+                <h1>Y STEM</h1>
+                <p>and Chess · Sign in to continue</p>
+              </div>
+              <div class="field">
+                <div class="field-label">Username</div>
+                <div class="field-value">student</div>
+              </div>
+              <div class="field">
+                <div class="field-label">Password</div>
+                <div class="field-value">••••••••</div>
+              </div>
+              <div class="btn-primary-block">Enter ♟</div>
+              <div class="signin-links">
+                <span class="link">Forgot Password</span>
+                <span style="color: #ccc">·</span>
+                <span class="link">Sign Up</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /auth -->
+
+    <!-- ════════════════════════════════════════
+       D1 — HOME
+  ════════════════════════════════════════ -->
+    <div class="section-title">D1 — Home</div>
+    <div class="phones-row">
+      <div class="phone-wrap">
+        <div class="phone-label">Home</div>
+        <div class="phone">
+          <div class="screen screen-bg">
+            <div class="status-bar">9:41<span>●●●</span></div>
+
+            <!-- Header -->
+            <div style="padding: 0 16px 10px">
+              <div
+                style="
+                  font-size: 7px;
+                  color: var(--muted);
+                  text-transform: uppercase;
+                  letter-spacing: 1.5px;
+                "
+              >
+                DASHBOARD
+              </div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--ink)">
+                Good morning, Alex 👋
+              </div>
+            </div>
+
+            <!-- Hero XP card -->
+            <div class="hero-card">
+              <div class="greeting">YOUR PROGRESS</div>
+              <div class="row mt4">
+                <div
+                  class="hero-stat"
+                  style="flex: 0 0 auto; margin-right: 12px; border: none"
+                >
+                  <div class="xp-num">250</div>
+                  <div style="font-size: 7px; color: rgba(255, 255, 255, 0.4)">
+                    XP · Level 3
+                  </div>
+                </div>
+                <div class="flex1">
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      font-size: 7px;
+                      color: rgba(255, 255, 255, 0.4);
+                      margin-bottom: 4px;
+                    "
+                  >
+                    <span>Level 3</span><span>Level 4</span>
+                  </div>
+                  <div class="xp-bar">
+                    <div class="xp-fill" style="width: 62%"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="hero-stats mt12">
+                <div class="hero-stat">
+                  <div class="val">5🔥</div>
+                  <div class="lbl">STREAK</div>
+                </div>
+                <div class="hero-stat">
+                  <div class="val">12🧩</div>
+                  <div class="lbl">PUZZLES</div>
+                </div>
+                <div class="hero-stat">
+                  <div class="val">3♟</div>
+                  <div class="lbl">WINS</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick actions -->
+            <div class="mt12 grid-2">
+              <div class="action-card">
+                <div class="action-bar" style="background: var(--green)"></div>
+                <div class="action-emoji">📚</div>
+                <div class="action-title">Learn</div>
+                <div class="action-sub">Knight · Step 3</div>
+              </div>
+              <div class="action-card">
+                <div class="action-bar" style="background: var(--yellow)"></div>
+                <div class="action-emoji">🧩</div>
+                <div class="action-title">Puzzles</div>
+                <div class="action-sub">Rating 1287</div>
+              </div>
+            </div>
+
+            <!-- Tab bar -->
+            <div class="tab-bar">
+              <div class="tab-item">
+                <span class="tab-icon active">🏠</span
+                ><span class="tab-lbl active">Home</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon">📚</span
+                ><span class="tab-lbl">Learn</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon">♟</span><span class="tab-lbl">Play</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon">👤</span
+                ><span class="tab-lbl">Profile</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /home -->
+
+    <!-- ════════════════════════════════════════
+       D2 — LESSONS
+  ════════════════════════════════════════ -->
+    <div class="section-title">D2 — Lessons</div>
+    <div class="phones-row">
+      <!-- Learn (selection) -->
+      <div class="phone-wrap">
+        <div class="phone-label">Lessons Selection</div>
+        <div class="phone">
+          <div class="screen screen-bg">
+            <div class="status-bar">9:41<span>●●●</span></div>
+            <div class="header-row">
+              <div>
+                <div class="header-sup">CHESS ACADEMY</div>
+                <div class="header-title sm">Your Learning Path</div>
+              </div>
+              <div class="chip chip-green">62% mastered</div>
+            </div>
+
+            <div
+              class="progress-bar"
+              style="margin: 0 16px; border-radius: 2px; overflow: hidden"
+            >
+              <div class="progress-fill" style="width: 62%"></div>
+            </div>
+
+            <!-- Piece pills -->
+            <div class="mt12 pieces-row">
+              <div class="piece-card selected">
+                <span class="piece-emoji">♞</span>
+                <span class="piece-name">Knight</span>
+                <div class="piece-prog">
+                  <div class="piece-fill" style="width: 50%"></div>
+                </div>
+              </div>
+              <div class="piece-card">
+                <span class="piece-emoji">♙</span>
+                <span class="piece-name">Pawn</span>
+                <div class="piece-prog">
+                  <div class="piece-fill" style="width: 100%"></div>
+                </div>
+              </div>
+              <div class="piece-card">
+                <span class="piece-emoji">♗</span>
+                <span class="piece-name">Bishop</span>
+                <div class="piece-prog">
+                  <div class="piece-fill" style="width: 0%"></div>
+                </div>
+              </div>
+              <div class="piece-card">
+                <span class="piece-emoji">♖</span>
+                <span class="piece-name">Rook</span>
+                <div class="piece-prog"></div>
+              </div>
+            </div>
+
+            <!-- Lesson list -->
+            <div class="card mt12" style="margin: 8px 16px; overflow: hidden">
+              <div class="lesson-row">
+                <div class="lesson-dot dot-done">✓</div>
+                <div class="flex1">
+                  <div class="lesson-title">What is a Knight?</div>
+                  <div class="lesson-meta">3 min · +20 XP</div>
+                </div>
+              </div>
+              <div class="lesson-row">
+                <div class="lesson-dot dot-done">✓</div>
+                <div class="flex1">
+                  <div class="lesson-title">How Knights Move</div>
+                  <div class="lesson-meta">5 min · +30 XP</div>
+                </div>
+              </div>
+              <div class="lesson-row">
+                <div class="lesson-dot dot-available">▶</div>
+                <div class="flex1">
+                  <div class="lesson-title">Knight Forks</div>
+                  <div class="lesson-meta">7 min · +40 XP</div>
+                </div>
+                <div class="chip chip-green">In progress</div>
+              </div>
+              <div class="lesson-row" style="border: none">
+                <div class="lesson-dot dot-locked">🔒</div>
+                <div class="flex1" style="opacity: 0.5">
+                  <div class="lesson-title">Advanced Knight Tactics</div>
+                  <div class="lesson-meta">8 min · +50 XP</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CTA -->
+            <div style="padding: 0 16px">
+              <div class="pill-btn">Continue: Knight Forks</div>
+            </div>
+
+            <div class="tab-bar">
+              <div class="tab-item">
+                <span class="tab-icon">🏠</span
+                ><span class="tab-lbl">Home</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon active">📚</span
+                ><span class="tab-lbl active">Learn</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon">♟</span><span class="tab-lbl">Play</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon">👤</span
+                ><span class="tab-lbl">Profile</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lesson Detail -->
+      <div class="phone-wrap">
+        <div class="phone-label">Lesson Detail</div>
+        <div class="phone">
+          <div class="screen screen-bg">
+            <div class="status-bar">9:41<span>●●●</span></div>
+
+            <!-- Top bar -->
+            <div class="row" style="padding: 0 16px 8px; gap: 8px">
+              <div style="font-size: 16px; color: var(--ink)">←</div>
+              <div class="flex1 col" style="align-items: center">
+                <div
+                  style="
+                    font-size: 7px;
+                    text-transform: uppercase;
+                    letter-spacing: 1.5px;
+                    color: var(--muted);
+                  "
+                >
+                  STEP 2 OF 4
+                </div>
+                <div
+                  style="font-size: 11px; font-weight: 700; color: var(--ink)"
+                >
+                  Knight Forks
+                </div>
+              </div>
+              <div class="chip chip-green">+40 XP</div>
+            </div>
+
+            <!-- Step dots -->
+            <div class="step-dots">
+              <div class="step-dot done" style="width: 24px"></div>
+              <div class="step-dot done" style="width: 24px"></div>
+              <div class="step-dot active"></div>
+              <div class="step-dot" style="width: 24px"></div>
+            </div>
+
+            <!-- Board -->
+            <div class="board-wrap">
+              <div class="chess-board">
+                <!-- 64 cells -->
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div
+                  class="cell-dark"
+                  style="
+                    font-size: 14px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  ♛
+                </div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div
+                  class="cell-dark"
+                  style="
+                    background: rgba(127, 204, 38, 0.45);
+                    font-size: 14px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  ♞
+                </div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div
+                  class="cell-dark"
+                  style="
+                    font-size: 14px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "
+                >
+                  ♜
+                </div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+                <div class="cell-dark"></div>
+                <div class="cell-light"></div>
+              </div>
+            </div>
+
+            <!-- Instruction -->
+            <div class="instruction-card">
+              <div class="inst-row">
+                <div class="piece-badge">♞ Knight</div>
+                <div class="chip chip-ink" style="margin-left: auto">
+                  Step 2
+                </div>
+              </div>
+              <div class="inst-text">
+                The Knight on d5 can fork both the Queen on c7 and the Rook on
+                e7 in a single move — winning material.
+              </div>
+              <div class="tip-box">
+                💡 A fork attacks two pieces at once — your opponent can only
+                save one!
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="lesson-footer">
+              <div class="btn-secondary">← Back</div>
+              <div class="btn-green-pill">Next Step →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /lessons -->
+
+    <!-- ════════════════════════════════════════
+       D3 — PUZZLES
+  ════════════════════════════════════════ -->
+    <div class="section-title">D3 — Puzzles</div>
+    <div class="phones-row">
+      <!-- Solving -->
+      <div class="phone-wrap">
+        <div class="phone-label">Solving</div>
+        <div class="phone">
+          <div class="screen screen-bg">
+            <div class="status-bar">9:41<span>●●●</span></div>
+            <div class="header-row">
+              <div>
+                <div class="header-sup">PUZZLE</div>
+                <div class="header-title sm">#4821</div>
+              </div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--ink)">
+                Puzzles
+              </div>
+              <div class="chip chip-yellow">🔥 5</div>
+            </div>
+
+            <!-- Board -->
+            <div style="padding: 0 16px; margin-bottom: 8px">
+              <div
+                style="
+                  border-radius: 10px;
+                  overflow: hidden;
+                  border: 1px solid var(--border);
+                "
+              >
+                <div class="chess-board">
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 13px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♛
+                  </div>
+                  <div class="cell-dark"></div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 13px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♜
+                  </div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 13px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♘
+                  </div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Info card -->
+            <div class="card info-card" style="padding: 10px">
+              <div class="row mb4">
+                <div class="rating-box">
+                  <div class="rating-lbl">Rating</div>
+                  <div class="rating-val">1287</div>
+                </div>
+                <div
+                  class="flex1"
+                  style="
+                    font-size: 9px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    line-height: 1.4;
+                  "
+                >
+                  White to move. Find the Knight fork that wins material.
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div
+                class="row"
+                style="flex-wrap: wrap; gap: 4px; margin-top: 4px"
+              >
+                <div class="theme-pill">Fork</div>
+                <div class="theme-pill">Knight</div>
+                <div class="theme-pill">Intermediate</div>
+              </div>
+              <div class="divider"></div>
+              <div class="hint-btn">💡 Show Hint (−5 pts)</div>
+            </div>
+
+            <!-- Footer -->
+            <div style="padding: 8px 16px 0">
+              <div class="pill-btn">Skip ›</div>
+            </div>
+
+            <div class="tab-bar">
+              <div class="tab-item">
+                <span class="tab-icon">🏠</span
+                ><span class="tab-lbl">Home</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon">📚</span
+                ><span class="tab-lbl">Learn</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon active">♟</span
+                ><span class="tab-lbl active">Play</span>
+              </div>
+              <div class="tab-item">
+                <span class="tab-icon">👤</span
+                ><span class="tab-lbl">Profile</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Correct -->
+      <div class="phone-wrap">
+        <div class="phone-label">Correct Result</div>
+        <div class="phone">
+          <div class="screen screen-bg">
+            <div class="status-bar">9:41<span>●●●</span></div>
+            <div class="header-row">
+              <div>
+                <div class="header-sup">PUZZLE</div>
+                <div class="header-title sm">#4821</div>
+              </div>
+              <div style="font-size: 14px; font-weight: 800">Puzzles</div>
+              <div class="chip chip-yellow">🔥 6</div>
+            </div>
+            <div style="padding: 0 16px; margin-bottom: 8px">
+              <div
+                style="
+                  border-radius: 10px;
+                  overflow: hidden;
+                  border: 1px solid var(--border);
+                  position: relative;
+                "
+              >
+                <div class="chess-board">
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      background: rgba(127, 204, 38, 0.5);
+                      font-size: 13px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♘
+                  </div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                </div>
+                <div
+                  style="
+                    position: absolute;
+                    inset: 0;
+                    background: rgba(127, 204, 38, 0.12);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 40px;
+                    opacity: 0.7;
+                  "
+                >
+                  ✓
+                </div>
+              </div>
+            </div>
+            <div class="result-banner">
+              <div class="result-icon-lg">🎉</div>
+              <div>
+                <div class="result-title">Brilliant!</div>
+                <div class="result-sub">+10 bonus XP · Streak: 6 🔥</div>
+              </div>
+            </div>
+            <div class="card info-card" style="padding: 10px; margin-top: 8px">
+              <div class="row mb4">
+                <div class="rating-box">
+                  <div class="rating-lbl">Rating</div>
+                  <div class="rating-val">1287</div>
+                </div>
+                <div
+                  class="flex1"
+                  style="
+                    font-size: 9px;
+                    font-weight: 600;
+                    color: var(--ink);
+                    line-height: 1.4;
+                  "
+                >
+                  White to move. Find the Knight fork that wins material.
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div
+                class="row"
+                style="flex-wrap: wrap; gap: 4px; margin-top: 4px"
+              >
+                <div class="theme-pill">Fork</div>
+                <div class="theme-pill">Knight</div>
+                <div class="theme-pill">Intermediate</div>
+              </div>
+            </div>
+            <div style="padding: 8px 16px 0">
+              <div class="pill-btn">Next Puzzle ›</div>
+            </div>
+            <div class="tab-bar">
+              <div class="tab-item"><span class="tab-icon">🏠</span></div>
+              <div class="tab-item"><span class="tab-icon">📚</span></div>
+              <div class="tab-item"><span class="tab-icon active">♟</span></div>
+              <div class="tab-item"><span class="tab-icon">👤</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /puzzles -->
+
+    <!-- ════════════════════════════════════════
+       D4 — PLAY VS COMPUTER
+  ════════════════════════════════════════ -->
+    <div class="section-title">D4 — Play vs Computer</div>
+    <div class="phones-row">
+      <!-- Setup -->
+      <div class="phone-wrap">
+        <div class="phone-label">Game Setup</div>
+        <div class="phone">
+          <div class="screen screen-bg">
+            <div class="status-bar">9:41<span>●●●</span></div>
+            <div style="padding: 0 16px 10px">
+              <div class="header-sup">SINGLE PLAYER</div>
+              <div class="header-title">Play vs Computer</div>
+            </div>
+
+            <!-- Color picker -->
+            <div
+              style="
+                font-size: 8px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1.5px;
+                color: var(--muted);
+                padding: 0 16px;
+                margin-bottom: 8px;
+              "
+            >
+              Choose your side
+            </div>
+            <div class="color-row">
+              <div class="color-card color-white selected">
+                <span class="piece-lg">♔</span>
+                <span class="lbl">White</span>
+                <span class="sub">Moves first</span>
+              </div>
+              <div class="color-card color-black">
+                <span class="piece-lg">♚</span>
+                <span class="lbl">Black</span>
+                <span class="sub" style="color: rgba(255, 255, 255, 0.4)"
+                  >Moves second</span
+                >
+              </div>
+              <div class="color-card color-rnd">
+                <span class="piece-lg">⚄</span>
+                <span class="lbl">Random</span>
+                <span class="sub">Surprise me!</span>
+              </div>
+            </div>
+
+            <!-- Difficulty -->
+            <div
+              style="
+                font-size: 8px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 1.5px;
+                color: var(--muted);
+                padding: 8px 16px 6px;
+              "
+            >
+              Difficulty
+            </div>
+            <div class="diff-row selected">
+              <div class="diff-accent" style="background: var(--green)"></div>
+              <span style="font-size: 16px">🌱</span>
+              <div class="diff-info">
+                <div class="lbl">Beginner</div>
+                <div class="desc">Learn the basics</div>
+              </div>
+              <div class="dots">
+                <div class="dot" style="background: var(--green)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+              </div>
+              <span
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: var(--green);
+                  margin-left: 4px;
+                "
+                >✓</span
+              >
+            </div>
+            <div class="diff-row">
+              <div
+                class="diff-accent"
+                style="background: var(--greenSoft)"
+              ></div>
+              <span style="font-size: 16px">😊</span>
+              <div class="diff-info">
+                <div class="lbl" style="color: var(--muted)">Easy</div>
+                <div class="desc">Gentle challenge</div>
+              </div>
+              <div class="dots">
+                <div class="dot" style="background: var(--greenSoft)"></div>
+                <div class="dot" style="background: var(--greenSoft)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+              </div>
+            </div>
+            <div class="diff-row">
+              <div class="diff-accent" style="background: var(--yellow)"></div>
+              <span style="font-size: 16px">🤔</span>
+              <div class="diff-info">
+                <div class="lbl" style="color: var(--muted)">Medium</div>
+                <div class="desc">Real thinking</div>
+              </div>
+              <div class="dots">
+                <div class="dot" style="background: var(--yellow)"></div>
+                <div class="dot" style="background: var(--yellow)"></div>
+                <div class="dot" style="background: var(--yellow)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+                <div class="dot" style="background: var(--border)"></div>
+              </div>
+            </div>
+
+            <!-- CTA -->
+            <div style="padding: 8px 16px 0">
+              <div class="pill-btn">Let's Play ♟</div>
+            </div>
+
+            <div class="tab-bar">
+              <div class="tab-item"><span class="tab-icon">🏠</span></div>
+              <div class="tab-item"><span class="tab-icon">📚</span></div>
+              <div class="tab-item"><span class="tab-icon active">♟</span></div>
+              <div class="tab-item"><span class="tab-icon">👤</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Game -->
+      <div class="phone-wrap">
+        <div class="phone-label">Active Game</div>
+        <div class="phone">
+          <div class="screen" style="background: var(--bg)">
+            <!-- Dark header -->
+            <div class="dark-header">
+              <div class="back-btn">←</div>
+              <div class="flex1 col" style="align-items: center">
+                <div style="font-size: 11px; font-weight: 800; color: #fff">
+                  vs Computer
+                </div>
+                <div style="font-size: 8px; color: rgba(255, 255, 255, 0.4)">
+                  🌱 Beginner · Playing White
+                </div>
+              </div>
+              <div
+                class="chip"
+                style="
+                  background: rgba(127, 204, 38, 0.2);
+                  color: var(--green);
+                  font-size: 8px;
+                "
+              >
+                +0.4
+              </div>
+            </div>
+
+            <!-- Black player -->
+            <div class="player-row">
+              <div
+                class="player-avatar"
+                style="background: #444; color: #fff; font-size: 10px"
+              >
+                🤖
+              </div>
+              <div>
+                <div class="player-name">Computer</div>
+                <div class="player-cap">♟♟ captured</div>
+              </div>
+              <div class="timer">3:42</div>
+            </div>
+
+            <!-- Board -->
+            <div style="padding: 0 12px">
+              <div style="border-radius: 8px; overflow: hidden">
+                <div class="chess-board">
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♜
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♞
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♝
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♛
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♚
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♝
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♞
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♜
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div class="cell-light"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♟
+                  </div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♗
+                  </div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div class="cell-light"></div>
+                  <div class="cell-dark"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div class="cell-dark"></div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♙
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♖
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♘
+                  </div>
+                  <div class="cell-light"></div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♕
+                  </div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♔
+                  </div>
+                  <div class="cell-dark"></div>
+                  <div
+                    class="cell-light"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♘
+                  </div>
+                  <div
+                    class="cell-dark"
+                    style="
+                      font-size: 10px;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                    "
+                  >
+                    ♖
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- White player -->
+            <div
+              class="player-row"
+              style="border-top: 1px solid var(--border); border-bottom: none"
+            >
+              <div class="player-avatar">A</div>
+              <div>
+                <div class="player-name">You (White)</div>
+                <div class="player-cap">Move 5</div>
+              </div>
+              <div class="timer active">4:15</div>
+            </div>
+
+            <!-- Tutor -->
+            <div class="tutor-card">
+              <div class="tutor-header">
+                <div class="tutor-icon">💡</div>
+                <span class="tutor-title">Tutor Tip</span>
+                <div class="chip chip-green" style="font-size: 8px">+0.4</div>
+              </div>
+              <div class="tutor-body" style="font-size: 8px; color: var(--ink)">
+                <div class="opening-name">Italian Game</div>
+                <div class="tutor-tip">
+                  Good bishop development! Consider castling soon to protect
+                  your king.
+                </div>
+              </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="dark-footer">
+              <div class="ctrl-btn">↩ Undo</div>
+              <div class="ctrl-btn">⇅ Flip</div>
+              <div class="ctrl-btn">½ Draw</div>
+              <div class="ctrl-btn danger">✕ Resign</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /play -->
+
+    <!-- ════════════════════════════════════════
+       PROFILE
+  ════════════════════════════════════════ -->
+    <div class="section-title">Profile</div>
+    <div class="phones-row">
+      <div class="phone-wrap">
+        <div class="phone-label">Profile</div>
+        <div class="phone">
+          <div class="screen screen-bg">
+            <div class="status-bar">9:41<span>●●●</span></div>
+
+            <!-- Hero -->
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 6px;
+                padding: 8px 0 12px;
+              "
+            >
+              <div class="avatar-ring"><div class="avatar-inner">A</div></div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--ink)">
+                Alex Chen
+              </div>
+              <div class="chip chip-green">🎒 Student</div>
+              <div class="row" style="gap: 6px">
+                <div class="chip chip-yellow">250 XP</div>
+                <span style="color: var(--muted); font-size: 10px">·</span>
+                <span style="font-size: 9px; color: var(--muted)">Level 3</span>
+              </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-bar">
+              <div class="stat-cell">
+                <div class="stat-val">5</div>
+                <div class="stat-lbl">📚 Lessons</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-val">12</div>
+                <div class="stat-lbl">🧩 Puzzles</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-val">3</div>
+                <div class="stat-lbl">♟ Wins</div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-val">5</div>
+                <div class="stat-lbl">🔥 Streak</div>
+              </div>
+            </div>
+
+            <!-- Badges -->
+            <div
+              style="
+                padding: 8px 16px 0;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <div style="font-size: 9px; font-weight: 700; color: var(--ink)">
+                Badges
+              </div>
+              <div style="font-size: 8px; color: var(--muted)">5/9 earned</div>
+            </div>
+            <div class="badge-grid mt8">
+              <div class="badge-card">
+                <span class="badge-emoji">🌱</span
+                ><span class="badge-lbl">First Lesson</span>
+              </div>
+              <div class="badge-card">
+                <span class="badge-emoji">🧩</span
+                ><span class="badge-lbl">Puzzle Solver</span>
+              </div>
+              <div class="badge-card">
+                <span class="badge-emoji">♟</span
+                ><span class="badge-lbl">First Win</span>
+              </div>
+              <div class="badge-card">
+                <span class="badge-emoji">🔥</span
+                ><span class="badge-lbl">5-Day Streak</span>
+              </div>
+              <div class="badge-card">
+                <span class="badge-emoji">📚</span
+                ><span class="badge-lbl">Quick Learner</span>
+              </div>
+              <div class="badge-card locked">
+                <span class="badge-emoji">🏆</span
+                ><span class="badge-lbl">Champion</span>
+              </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="menu-card mt12" style="margin-bottom: 8px">
+              <div class="menu-row">
+                <div class="menu-icon">✏️</div>
+                <div class="flex1">
+                  <div class="menu-lbl">Edit Profile</div>
+                  <div class="menu-sub">Name, avatar, bio</div>
+                </div>
+                <span class="arrow">›</span>
+              </div>
+              <div class="menu-row">
+                <div class="menu-icon">🔔</div>
+                <div class="flex1">
+                  <div class="menu-lbl">Notifications</div>
+                  <div class="menu-sub">Alerts & reminders</div>
+                </div>
+                <span class="arrow">›</span>
+              </div>
+              <div class="menu-row" style="border: none">
+                <div class="menu-icon">❓</div>
+                <div class="flex1">
+                  <div class="menu-lbl">Help & Support</div>
+                  <div class="menu-sub">FAQs & contact us</div>
+                </div>
+                <span class="arrow">›</span>
+              </div>
+            </div>
+
+            <div
+              style="
+                margin: 0 16px;
+                background: #fff;
+                border-radius: 12px;
+                border: 1px solid var(--border);
+                padding: 10px;
+                text-align: center;
+                font-size: 9px;
+                font-weight: 600;
+                color: var(--error);
+              "
+            >
+              Sign out
+            </div>
+
+            <div class="tab-bar">
+              <div class="tab-item"><span class="tab-icon">🏠</span></div>
+              <div class="tab-item"><span class="tab-icon">📚</span></div>
+              <div class="tab-item"><span class="tab-icon">♟</span></div>
+              <div class="tab-item">
+                <span class="tab-icon active">👤</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /profile -->
+
+    <div class="footer-note">
+      <span>Y STEM and Chess</span> — Mobile UI/UX by Sandith Hewage<br />
+      <span style="color: #444"
+        >design/sandith-ui-screens · React Native + Expo Router</span
+      >
+    </div>
+  </body>
+</html>
