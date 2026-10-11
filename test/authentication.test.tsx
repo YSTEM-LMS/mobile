@@ -16,7 +16,9 @@ import { tokenStore } from '@/services/storage/TokenStore';
 import { createQueryClient } from '@/providers/QueryProvider';
 import { SessionProvider, useSession } from '@/providers/SessionProvider';
 import { renderAnonymous } from './fixtures/renderAnonymous';
-import { studentToken } from './fixtures/studentToken';
+
+const studentToken =
+  'eyJ0eXAiOiJKV1QifQ.eyJpZCI6IjEyMyIsImRpc3BsYXlOYW1lIjoiVGVzdCBTdHVkZW50Iiwicm9sZSI6InN0dWRlbnQifQ.fake';
 
 function submitSignIn(username: string, password: string) {
   fireEvent.changeText(screen.getByTestId('username-input'), username);
