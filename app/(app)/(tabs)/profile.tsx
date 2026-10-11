@@ -17,6 +17,9 @@ import {
 import { useSession } from '@/providers/SessionProvider';
 import { useState } from 'react';
 import { InlineError } from '@/components/feedback/InlineError';
+import { AppError } from '@/services/api/apiError';
+import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
+import { Spinner } from '@/components/ui/Spinner';
 
 type Badge = {
   id: string;
@@ -143,18 +146,33 @@ export default function ProfileRoute() {
   const earnedCount = BADGES.filter((b) => b.earned).length;
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
+  const [connectionError, setConnectionError] = useState('');
 
   const signOutPressed = async () => {
     setSigningOut(true);
+    setError('');
+    setConnectionError('');
 
     try {
       await signOut();
     } catch (error) {
       setSigningOut(false);
-      const message = error instanceof Error ? error.message : 'Sign out failed. Please try again.';
-      setError(message);
+      if (error instanceof AppError) {
+        switch (error.code) {
+          case 'NETWORK_ERROR':
+            setConnectionError(error.message);
+            break;
+          case 'REQUEST_TIMEOUT':
+            setConnectionError(error.message);
+            break;
+          default:
+            setError(error.message);
+            break;
+        }
+      } else {
+        setError('Sign out failed. Please try again.');
+      }
     }
-   
   };
 
   return (
@@ -282,10 +300,18 @@ export default function ProfileRoute() {
             pressed && s.signOutBtnPressed,
           ]}
         >
-          <Text style={s.signOutText}>Sign out</Text>
+          {signingOut ? (
+            <Spinner label="Signing out" />
+          ) : (
+            <Text style={s.signOutText}>Sign out</Text>
+          )}
         </Pressable>
 
-         {error && <InlineError message={error} />}
+        {error && <InlineError message={error} />}
+
+        {connectionError && (
+          <ConnectionBanner message={connectionError} status="offline" />
+        )}
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
