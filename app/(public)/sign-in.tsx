@@ -140,7 +140,7 @@ export default function SignInRoute() {
               <View style={[s.field, usernameFocused && s.fieldFocused]}>
                 <Text style={s.fieldIcon}>👤</Text>
                 <TextInput
-                testID="username-input"
+                  testID="username-input"
                   autoCapitalize="none"
                   autoCorrect={false}
                   onBlur={() => setUsernameFocused(false)}
@@ -216,34 +216,42 @@ export default function SignInRoute() {
           </View>
 
           {/* ── Dev Quick-Login ───────────────────── */}
-          <View style={s.dev}>
-            <View style={s.devDivider}>
-              <View style={s.devLine} />
-              <Text style={s.devLabel}>DEV ONLY</Text>
-              <View style={s.devLine} />
+          {__DEV__ && (
+            <View style={s.dev}>
+              <View style={s.devDivider}>
+                <View style={s.devLine} />
+                <Text style={s.devLabel}>DEV ONLY</Text>
+                <View style={s.devLine} />
+              </View>
+              <View style={s.devRow}>
+                {(['student', 'mentor'] as const).map((role) => (
+                  <Pressable
+                    key={role}
+                    accessibilityLabel={`Continue as ${role}`}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      void mockSignInAs(role).catch(() => {
+                        setError(
+                          'Unable to start a test session. Please try again.',
+                        );
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      s.devBtn,
+                      pressed && s.devBtnPressed,
+                    ]}
+                  >
+                    <Text style={s.devBtnIcon}>
+                      {role === 'student' ? '🎒' : '🎓'}
+                    </Text>
+                    <Text style={s.devBtnText}>
+                      {role === 'student' ? 'Student' : 'Mentor'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-            <View style={s.devRow}>
-              {(['student', 'mentor'] as const).map((role) => (
-                <Pressable
-                  key={role}
-                  accessibilityLabel={`Continue as ${role}`}
-                  accessibilityRole="button"
-                  onPress={() => mockSignInAs(role)}
-                  style={({ pressed }) => [
-                    s.devBtn,
-                    pressed && s.devBtnPressed,
-                  ]}
-                >
-                  <Text style={s.devBtnIcon}>
-                    {role === 'student' ? '🎒' : '🎓'}
-                  </Text>
-                  <Text style={s.devBtnText}>
-                    {role === 'student' ? 'Student' : 'Mentor'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

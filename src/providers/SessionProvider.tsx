@@ -11,7 +11,6 @@ import {
   initialSessionState,
   sessionReducer,
   type SessionState,
-  type SessionUser,
   type UserRole,
 } from '@/state/session';
 
@@ -19,30 +18,46 @@ import { tokenStore } from '@/services/storage/TokenStore';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { authGateway } from '@/services/auth/AuthGateway';
+import { AppError } from '@/services/api/apiError';
+import { decodeJWT } from '@/services/auth/decodeJWT';
+import type { AuthGateway } from '@/types/authGateway';
 
 type SessionContextValue = {
   session: SessionState;
-  mockSignInAs: (role: UserRole) => void;
+  mockSignInAs: (role: UserRole) => Promise<void>;
   signIn: (username: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   expiredSession: () => Promise<void>;
   restoreSession: () => Promise<void>;
 };
 
-const mockUsers: Record<UserRole, SessionUser> = {
-  student: {
-    id: 'mock-student',
-    displayName: 'Mock Student',
-    role: 'student',
+export const studentToken =
+  'eyJ0eXAiOiJKV1QifQ.eyJpZCI6Im1vY2stc3R1ZGVudCIsImRpc3BsYXlOYW1lIjoiTW9jayBTdHVkZW50Iiwicm9sZSI6InN0dWRlbnQifQ.fake';
+
+export const mentorToken =
+  'eyJ0eXAiOiJKV1QifQ.eyJpZCI6Im1vY2stbWVudG9yIiwiZGlzcGxheU5hbWUiOiJNb2NrIE1lbnRvciIsInJvbGUiOiJtZW50b3IifQ.fake';
+
+const fakeAuthGateway: AuthGateway = {
+  async login(username) {
+    if (username === 'student') return studentToken;
+    if (username === 'mentor') return mentorToken;
+    throw new AppError('UNKNOWN', 'Unknown test account.');
   },
-  mentor: {
-    id: 'mock-mentor',
-    displayName: 'Mock Mentor',
-    role: 'mentor',
+  async logout() {
+    try {
+      await tokenStore.deleteToken();
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError('UNKNOWN', 'Sign out failed. Please try again.');
+    }
+  },
+  async validate(token) {
+    return token === studentToken || token === mentorToken;
   },
 };
-
-
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
@@ -51,11 +66,6 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   // Used to clear cache when signing out.
   const queryClient = useQueryClient();
-
-  // On launch check if a user has a valid session
-  useEffect(() => {
-    restoreSession();
-  }, []);
 
   const restoreRef = useRef(false);
 
@@ -68,23 +78,37 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     restoreRef.current = true;
 
-    dispatch({ type: 'launchRestore' });
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 2000);
-    });
+    dispatch({ type: 'restore' });
+
     try {
       const token = await tokenStore.getToken();
 
-      // A saved token exist, now validate it.
       if (token) {
-        const validToken = await authGateway.validate(token);
+        // For dev testing
+        const isFakeToken =
+          __DEV__ && (token === studentToken || token === mentorToken);
+        const validToken = isFakeToken
+          ? await fakeAuthGateway.validate(token)
+          : await authGateway.validate(token);
 
         if (validToken) {
-          // for now mock role
-          const role = 'student';
+          const decoded = decodeJWT(token);
+
+          if (
+            typeof decoded.id !== 'string' ||
+            typeof decoded.displayName !== 'string' ||
+            (decoded.role !== 'student' && decoded.role !== 'mentor')
+          ) {
+            throw new Error('Missing user claims');
+          }
+
           dispatch({
             type: 'authenticated',
-            user: mockUsers[role],
+            user: {
+              id: decoded.id,
+              displayName: decoded.displayName,
+              role: decoded.role,
+            },
           });
         } else {
           // token is invalid. Session state is expired
@@ -97,30 +121,50 @@ export function SessionProvider({ children }: PropsWithChildren) {
     } catch (error) {
       // Show an error state. Ask to refetch, since there may be a valid token.
       // Error is caused either by secure token get failing, or connection failure when validating.
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Failed to restore session. Please try again.';
+      if (error instanceof AppError && error.code === 'SESSION_EXPIRED') {
+        await expiredSession();
+      } else {
+        const message =
+          error instanceof AppError
+            ? error.message
+            : 'Failed to restore session. Please try again.';
 
-      dispatch({
-        type: 'launchError',
-        errorMessage: message,
-      });
+        dispatch({
+          type: 'error',
+          errorMessage: message,
+        });
+      }
     } finally {
       restoreRef.current = false;
     }
   }
 
-  function mockSignInAs(role: UserRole) {
+  async function mockSignInAs(role: UserRole) {
+    if (!__DEV__) return;
+
+    const token = await fakeAuthGateway.login(role, '');
+
+    const decoded = decodeJWT(token);
+
+    if (
+      typeof decoded.id !== 'string' ||
+      typeof decoded.displayName !== 'string' ||
+      (decoded.role !== 'student' && decoded.role !== 'mentor')
+    ) {
+      throw new Error('Missing user claims');
+    }
+
+    await tokenStore.setToken(token);
+
     dispatch({
       type: 'authenticated',
-      user: mockUsers[role],
+      user: {
+        id: decoded.id,
+        displayName: decoded.displayName,
+        role: decoded.role,
+      },
     });
   }
-
-  // This function will get called if there is a 401 response meaning the token is expired.
-  // Or if the token expired when the app was first launched
-  // use ref incase multiple 401 responses happens and expiredSession gets called multiple times.
 
   const expiringRef = useRef(false);
   async function expiredSession() {
@@ -132,16 +176,20 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     // This ensures if deleteToken fails cancelQueries still gets called
     try {
-      await Promise.allSettled([
-        tokenStore.deleteToken(),
-        queryClient.cancelQueries(),
-      ]);
-
+      await queryClient.cancelQueries();
       queryClient.clear();
+
+      await tokenStore.deleteToken();
 
       dispatch({
         type: 'expired',
         expiredMessage: 'Your session has expired. Please sign in again.',
+      });
+    } catch {
+      dispatch({
+        type: 'error',
+        errorMessage:
+          'Your session has expired, but we could not sign you out. Please sign out.',
       });
     } finally {
       expiringRef.current = false;
@@ -154,53 +202,62 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
       if (!token) {
         // Empty token recieved
-        throw new Error('Invalid credentials. Please try again.');
+        throw new AppError(
+          'INVALID_RESPONSE',
+          'The server returned an invalid response.',
+        );
       }
 
-      // Validate token
-      const valid = await authGateway.validate(token);
+      const decoded = decodeJWT(token);
 
-      if (!valid) {
-        throw new Error('Invalid token. Please sign in again.');
+      if (
+        typeof decoded.id !== 'string' ||
+        typeof decoded.displayName !== 'string' ||
+        (decoded.role !== 'student' && decoded.role !== 'mentor')
+      ) {
+        throw new Error('Missing user claims');
       }
 
       await tokenStore.setToken(token);
 
-      // For now assume role until we're able to decode the token and get users role
-      const role = 'student';
-
       dispatch({
         type: 'authenticated',
-        user: mockUsers[role],
+        user: {
+          id: decoded.id,
+          displayName: decoded.displayName,
+          role: decoded.role,
+        },
       });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Sign in failed. Please try again.';
-      throw Error(message);
+      if (error instanceof AppError) {
+        throw error;
+      } else {
+        throw new AppError('UNKNOWN', 'Sign in failed. Please try again.');
+      }
     }
   }
 
   async function signOut() {
     try {
-      // delete the saved token
-      await tokenStore.deleteToken();
-
-      // cancel any on going queries and clear cache.
       await queryClient.cancelQueries();
       queryClient.clear();
 
-      // make the users sign out and their status anonymous
+      await authGateway.logout();
+
       dispatch({ type: 'signedOut' });
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Sign out failed. Please try again.';
-      throw Error(message);
+      if (error instanceof AppError) {
+        throw error;
+      } else {
+        throw new AppError('UNKNOWN', 'Sign out failed. Please try again.');
+      }
     }
   }
+
+  // On launch check if a user has a valid session
+  useEffect(() => {
+    restoreSession();
+  }, []);
 
   return (
     <SessionContext.Provider
