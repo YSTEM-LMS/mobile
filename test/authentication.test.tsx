@@ -18,7 +18,7 @@ import { SessionProvider, useSession } from '@/providers/SessionProvider';
 import { renderAnonymous } from './fixtures/renderAnonymous';
 
 const studentToken =
-  'eyJ0eXAiOiJKV1QifQ.eyJpZCI6IjEyMyIsImRpc3BsYXlOYW1lIjoiVGVzdCBTdHVkZW50Iiwicm9sZSI6InN0dWRlbnQifQ.fake';
+  'eyJ0eXAiOiJKV1QifQ.eyJ1c2VybmFtZSI6InRlc3Qtc3R1ZGVudCIsImZpcnN0TmFtZSI6IlRlc3QiLCJsYXN0TmFtZSI6IlN0dWRlbnQiLCJyb2xlIjoic3R1ZGVudCJ9.fake';
 
 function submitSignIn(username: string, password: string) {
   fireEvent.changeText(screen.getByTestId('username-input'), username);

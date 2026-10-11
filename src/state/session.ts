@@ -1,9 +1,7 @@
-import { readonly } from 'zod';
-
 export type UserRole = 'student' | 'mentor';
 
 export type SessionUser = {
-  readonly id: string;
+  readonly username: string;
   readonly displayName: string;
   readonly role: UserRole;
 };
@@ -26,7 +24,7 @@ export type SessionState =
   | {
       readonly status: 'error';
       readonly errorMessage: string;
-    }
+    };
 
 export type SessionAction =
   | {
@@ -52,7 +50,7 @@ export type SessionAction =
   | {
       readonly type: 'expired';
       readonly expiredMessage: string;
-    }
+    };
 
 export const initialSessionState: SessionState = {
   status: 'bootstrapping',

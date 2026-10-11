@@ -13,7 +13,7 @@ export default function ErrorScreen({
   return (
     <>
       <InlineError message={message} />
-      <Button onPress={restoreSession} >Retry</Button>
+      <Button onPress={restoreSession}>Retry</Button>
       <Button onPress={signOut}>Sign Out</Button>
     </>
   );

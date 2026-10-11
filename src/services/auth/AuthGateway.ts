@@ -4,8 +4,6 @@ import type { ApiClientInterface } from '@/types/apiClient.types';
 import { tokenStore } from '../storage/TokenStore';
 import { AuthGateway, LoginResponse } from '@/types/authGateway';
 
-
-
 export function createAuthGateway(client: ApiClientInterface): AuthGateway {
   return {
     async login(username, password) {
@@ -25,7 +23,7 @@ export function createAuthGateway(client: ApiClientInterface): AuthGateway {
       try {
         await tokenStore.deleteToken();
       } catch (error) {
-        if(error instanceof AppError) {
+        if (error instanceof AppError) {
           throw error;
         }
 

@@ -1,6 +1,7 @@
 import {
   createContext,
   type PropsWithChildren,
+  useCallback,
   useContext,
   useEffect,
   useReducer,
@@ -32,10 +33,10 @@ type SessionContextValue = {
 };
 
 export const studentToken =
-  'eyJ0eXAiOiJKV1QifQ.eyJpZCI6Im1vY2stc3R1ZGVudCIsImRpc3BsYXlOYW1lIjoiTW9jayBTdHVkZW50Iiwicm9sZSI6InN0dWRlbnQifQ.fake';
+  'eyJ0eXAiOiJKV1QifQ.eyJ1c2VybmFtZSI6Im1vY2stc3R1ZGVudCIsImZpcnN0TmFtZSI6Ik1vY2siLCJsYXN0TmFtZSI6IlN0dWRlbnQiLCJyb2xlIjoic3R1ZGVudCJ9.fake';
 
 export const mentorToken =
-  'eyJ0eXAiOiJKV1QifQ.eyJpZCI6Im1vY2stbWVudG9yIiwiZGlzcGxheU5hbWUiOiJNb2NrIE1lbnRvciIsInJvbGUiOiJtZW50b3IifQ.fake';
+  'eyJ0eXAiOiJKV1QifQ.eyJ1c2VybmFtZSI6Im1vY2stbWVudG9yIiwiZmlyc3ROYW1lIjoiTW9jayIsImxhc3ROYW1lIjoiTWVudG9yIiwicm9sZSI6Im1lbnRvciJ9.fake';
 
 const fakeAuthGateway: AuthGateway = {
   async login(username) {
@@ -67,9 +68,39 @@ export function SessionProvider({ children }: PropsWithChildren) {
   // Used to clear cache when signing out.
   const queryClient = useQueryClient();
 
+  const expiringRef = useRef(false);
+  const expiredSession = useCallback(async () => {
+    if (expiringRef.current) {
+      return;
+    }
+
+    expiringRef.current = true;
+
+    // This ensures if deleteToken fails cancelQueries still gets called
+    try {
+      await queryClient.cancelQueries();
+      queryClient.clear();
+
+      await tokenStore.deleteToken();
+
+      dispatch({
+        type: 'expired',
+        expiredMessage: 'Your session has expired. Please sign in again.',
+      });
+    } catch {
+      dispatch({
+        type: 'error',
+        errorMessage:
+          'Your session has expired, but we could not sign you out. Please sign out.',
+      });
+    } finally {
+      expiringRef.current = false;
+    }
+  }, [queryClient]);
+
   const restoreRef = useRef(false);
 
-  async function restoreSession(): Promise<void> {
+  const restoreSession = useCallback(async (): Promise<void> => {
     // This prevents a user from pressing on the retry button multiple times.
     // Which will cause this function to run multiple times.
     if (restoreRef.current) {
@@ -95,8 +126,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
           const decoded = decodeJWT(token);
 
           if (
-            typeof decoded.id !== 'string' ||
-            typeof decoded.displayName !== 'string' ||
+            typeof decoded.firstName !== 'string' ||
+            typeof decoded.lastName !== 'string' ||
+            typeof decoded.username !== 'string' ||
             (decoded.role !== 'student' && decoded.role !== 'mentor')
           ) {
             throw new Error('Missing user claims');
@@ -105,8 +137,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
           dispatch({
             type: 'authenticated',
             user: {
-              id: decoded.id,
-              displayName: decoded.displayName,
+              username: decoded.username,
+              displayName: decoded.firstName + ' ' + decoded.lastName,
               role: decoded.role,
             },
           });
@@ -137,7 +169,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     } finally {
       restoreRef.current = false;
     }
-  }
+  }, [expiredSession]);
 
   async function mockSignInAs(role: UserRole) {
     if (!__DEV__) return;
@@ -147,8 +179,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     const decoded = decodeJWT(token);
 
     if (
-      typeof decoded.id !== 'string' ||
-      typeof decoded.displayName !== 'string' ||
+      typeof decoded.firstName !== 'string' ||
+      typeof decoded.lastName !== 'string' ||
+      typeof decoded.username !== 'string' ||
       (decoded.role !== 'student' && decoded.role !== 'mentor')
     ) {
       throw new Error('Missing user claims');
@@ -159,41 +192,11 @@ export function SessionProvider({ children }: PropsWithChildren) {
     dispatch({
       type: 'authenticated',
       user: {
-        id: decoded.id,
-        displayName: decoded.displayName,
+        username: decoded.username,
+        displayName: decoded.firstName + ' ' + decoded.lastName,
         role: decoded.role,
       },
     });
-  }
-
-  const expiringRef = useRef(false);
-  async function expiredSession() {
-    if (expiringRef.current) {
-      return;
-    }
-
-    expiringRef.current = true;
-
-    // This ensures if deleteToken fails cancelQueries still gets called
-    try {
-      await queryClient.cancelQueries();
-      queryClient.clear();
-
-      await tokenStore.deleteToken();
-
-      dispatch({
-        type: 'expired',
-        expiredMessage: 'Your session has expired. Please sign in again.',
-      });
-    } catch {
-      dispatch({
-        type: 'error',
-        errorMessage:
-          'Your session has expired, but we could not sign you out. Please sign out.',
-      });
-    } finally {
-      expiringRef.current = false;
-    }
   }
 
   async function signIn(username: string, password: string): Promise<void> {
@@ -211,8 +214,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
       const decoded = decodeJWT(token);
 
       if (
-        typeof decoded.id !== 'string' ||
-        typeof decoded.displayName !== 'string' ||
+        typeof decoded.firstName !== 'string' ||
+        typeof decoded.lastName !== 'string' ||
+        typeof decoded.username !== 'string' ||
         (decoded.role !== 'student' && decoded.role !== 'mentor')
       ) {
         throw new Error('Missing user claims');
@@ -223,8 +227,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
       dispatch({
         type: 'authenticated',
         user: {
-          id: decoded.id,
-          displayName: decoded.displayName,
+          username: decoded.username,
+          displayName: decoded.firstName + ' ' + decoded.lastName,
           role: decoded.role,
         },
       });
@@ -257,7 +261,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   // On launch check if a user has a valid session
   useEffect(() => {
     restoreSession();
-  }, []);
+  }, [restoreSession]);
 
   return (
     <SessionContext.Provider
