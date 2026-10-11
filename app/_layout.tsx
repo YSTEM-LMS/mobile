@@ -8,7 +8,7 @@ import { QueryProvider } from '@/providers/QueryProvider';
 
 import '@/config/env';
 
-import LaunchError from '@/features/auth/components/launch-error';
+import ErrorScreen from '@/features/auth/components/error-screen';
 
 export default function RootLayout() {
   return (
@@ -40,10 +40,10 @@ function RootNavigator() {
       <Screen
         background="patterned"
         centered
-        testID="session-bootstrap-screen" // change this
+        testID="session-error-screen"
         contentStyle={{ gap: 16 }}
       >
-        <LaunchError
+        <ErrorScreen
           message={message}
           restoreSession={restoreSession}
           signOut={signOut}
