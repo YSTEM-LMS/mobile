@@ -5,9 +5,16 @@ import { env } from '@/config/env';
 
 export type StockfishLevel = 1 | 2 | 3 | 4 | 5;
 
+/**
+ * The engine's reply move in UCI format (e.g. "e7e5", promotions like "e7e8q").
+ *
+ * The server's `newFEN` field is deliberately not exposed: when a player move
+ * is sent, the server applies the engine's reply to the position *before* the
+ * player's move, so `newFEN` is wrong. Callers apply `move` to their own board
+ * instead, as the website does. See docs/stockfish-socket-contract.md.
+ */
 export interface EngineMove {
-  move: string; // e.g. "e7e5"
-  newFen: string;
+  move: string;
 }
 
 export interface StockfishClient {
@@ -75,10 +82,11 @@ const sessionStartedSchema = z.object({
   success: z.literal(true),
 });
 
+// Only the fields the client uses are validated. `newFEN` and `moveDetails`
+// are unreliable when a player move is sent (see EngineMove) and are ignored.
 const evaluationCompleteSchema = z.object({
   mode: z.literal('move'),
   move: z.string().min(1),
-  newFEN: z.string().min(1),
 });
 
 function describeIssues(error: z.ZodError): string {
@@ -103,7 +111,7 @@ function parseEvaluationComplete(payload: unknown): EngineMove {
       `Invalid evaluation-complete payload: ${describeIssues(result.error)}`,
     );
   }
-  return { move: result.data.move, newFen: result.data.newFEN };
+  return { move: result.data.move };
 }
 
 /** Turns a failure event's payload into a readable message. */
@@ -350,9 +358,8 @@ export function createStockfishClient({
         cancellers,
         parse: parseEvaluationComplete,
       });
-      // OPEN QUESTION: the server treats `level` as search depth (1–30). Until
-      // the team decides whether 1–5 should map to larger depths, it is sent
-      // unchanged. Any mapping belongs on this line only.
+      // Difficulty maps directly to the server's search depth (level 3 means
+      // `go depth 3`), as confirmed by the team, so it is sent unchanged.
       current.emit('evaluate-fen', { fen, move, level });
       return await reply;
     } finally {

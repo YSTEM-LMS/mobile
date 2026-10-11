@@ -10,17 +10,16 @@ import { FakeSocket } from './mocks/FakeSocket';
 
 const TIMEOUT_MS = 1_000;
 
-// Position after 1. e4 (the player's move is applied by the server).
 const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-const AFTER_E5_FEN =
-  'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
 
-// Shape copied from stockfishServer/src/managers/StockfishManager.js (move mode).
+// What the real server sends for { fen: START_FEN, move: 'e2e4' }: the engine's
+// move is correct, but moveDetails is null and newFEN is unchanged, because the
+// server applies e7e5 to the position before e2e4. The client returns only `move`.
 const ENGINE_REPLY = {
   mode: 'move',
   move: 'e7e5',
-  moveDetails: { from: 'e7', to: 'e5', piece: 'p', color: 'b', san: 'e5' },
-  newFEN: AFTER_E5_FEN,
+  moveDetails: null,
+  newFEN: START_FEN,
 };
 
 /**
@@ -257,10 +256,7 @@ describe('createStockfishClient: requestMove', () => {
     });
     socket.serverEmit('evaluation-complete', ENGINE_REPLY);
 
-    await expect(result).resolves.toEqual({
-      move: 'e7e5',
-      newFen: AFTER_E5_FEN,
-    });
+    await expect(result).resolves.toEqual({ move: 'e7e5' });
     expect(socket.listenerCount()).toBe(0);
   });
 
@@ -332,10 +328,7 @@ describe('createStockfishClient: requestMove', () => {
     expect(socket.payloadsFor('evaluate-fen')).toHaveLength(1);
 
     socket.serverEmit('evaluation-complete', ENGINE_REPLY);
-    await expect(first).resolves.toEqual({
-      move: 'e7e5',
-      newFen: AFTER_E5_FEN,
-    });
+    await expect(first).resolves.toEqual({ move: 'e7e5' });
   });
 
   it('does not accumulate listeners across requests', async () => {
