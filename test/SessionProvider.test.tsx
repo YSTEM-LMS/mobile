@@ -6,6 +6,7 @@ import {
 } from '@testing-library/react-native';
 import { Button, Text, View } from 'react-native';
 
+import { QueryProvider } from '@/providers/QueryProvider';
 import { SessionProvider, useSession } from '@/providers/SessionProvider';
 
 function SessionTestHarness() {
@@ -31,9 +32,11 @@ function SessionTestHarness() {
 describe('SessionProvider', () => {
   it('finishes bootstrap as anonymous', async () => {
     render(
-      <SessionProvider>
-        <SessionTestHarness />
-      </SessionProvider>,
+      <QueryProvider>
+        <SessionProvider>
+          <SessionTestHarness />
+        </SessionProvider>
+      </QueryProvider>,
     );
 
     await waitFor(() => {
@@ -43,10 +46,14 @@ describe('SessionProvider', () => {
 
   it('supports mocked student sign-in and sign-out', async () => {
     render(
-      <SessionProvider>
-        <SessionTestHarness />
-      </SessionProvider>,
+      <QueryProvider>
+        <SessionProvider>
+          <SessionTestHarness />
+        </SessionProvider>
+      </QueryProvider>,
     );
+
+    await screen.findByText('anonymous');
 
     fireEvent.press(
       screen.getByRole('button', {
@@ -64,15 +71,19 @@ describe('SessionProvider', () => {
       }),
     );
 
-    expect(screen.getByText('anonymous')).toBeOnTheScreen();
+    await screen.findByText('anonymous');
   });
 
-  it('supports mocked mentor sign-in', () => {
+  it('supports mocked mentor sign-in', async () => {
     render(
-      <SessionProvider>
-        <SessionTestHarness />
-      </SessionProvider>,
+      <QueryProvider>
+        <SessionProvider>
+          <SessionTestHarness />
+        </SessionProvider>
+      </QueryProvider>,
     );
+
+    await screen.findByText('anonymous');
 
     fireEvent.press(
       screen.getByRole('button', {
