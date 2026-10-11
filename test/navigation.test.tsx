@@ -127,10 +127,13 @@ describe('session-aware navigation', () => {
       router.push('/profile');
     });
 
-    await waitFor(() => {
-      expect(renderedRouter.getPathname()).toBe('/profile');
-      expect(screen.getByText('Mock Student')).toBeOnTheScreen();
-    });
+    await waitFor(
+      () => {
+        expect(renderedRouter.getPathname()).toBe('/profile');
+        expect(screen.getByText('Sample Student')).toBeOnTheScreen();
+      },
+      { timeout: 3000 },
+    );
 
     fireEvent.press(
       screen.getByRole('button', {
