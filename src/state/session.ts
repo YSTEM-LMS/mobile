@@ -1,4 +1,4 @@
-import { readonly } from "zod";
+import { readonly } from 'zod';
 
 export type UserRole = 'student' | 'mentor';
 
@@ -19,11 +19,14 @@ export type SessionState =
       readonly status: 'authenticated';
       readonly user: SessionUser;
     }
-  |
-   {
+  | {
+      readonly status: 'expired';
+      readonly expiredMessage: string;
+    }
+  | {
       readonly status: 'error';
       readonly errorMessage: string;
-   };
+    }
 
 export type SessionAction =
   | {
@@ -40,13 +43,16 @@ export type SessionAction =
       readonly type: 'anonymous';
     }
   | {
-      readonly type: 'launchError';
+      readonly type: 'error';
       readonly errorMessage: string;
     }
   | {
-      readonly type: 'launchRestore';
+      readonly type: 'restore';
     }
-  
+  | {
+      readonly type: 'expired';
+      readonly expiredMessage: string;
+    }
 
 export const initialSessionState: SessionState = {
   status: 'bootstrapping',
@@ -66,15 +72,18 @@ export function sessionReducer(
       };
     case 'signedOut':
       return state.status === 'anonymous' ? state : { status: 'anonymous' };
-    case 'launchError':
-      return { 
-        status: 'error', 
-        errorMessage: action.errorMessage, 
-      };
     case 'anonymous':
       return { status: 'anonymous' };
-    case 'launchRestore':
-      return { status: 'bootstrapping'}
+    case 'expired':
+      return { status: 'expired', expiredMessage: action.expiredMessage };
+    case 'error':
+      return {
+        status: 'error',
+        errorMessage: action.errorMessage,
+      };
+    case 'restore':
+      return { status: 'bootstrapping' };
+
     default: {
       const exhaustiveAction: never = action;
       return exhaustiveAction;
