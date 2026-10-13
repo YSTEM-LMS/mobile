@@ -14,8 +14,9 @@ export type Puzzle = {
   popularity?: number;
   // Backend nbPlays
   plays?: number;
-  // Tag names provided by backend ex. "backRankMate". Empty array if none are provided.
+  // Tag names for involved concepts provided by backend ex. "backRankMate". Empty array if none are provided.
   themes: string[];
   gameUrl?: string;
+  // Tag names for chess openings associated with the puzzle provided by backend.
   openingTags: string[];
 };

@@ -22,4 +22,3 @@ export const backendPuzzlesResponseSchema = z.array(backendPuzzleSchema);
 
 // TypeScript type inferred from the schema, representing the structure of a backend puzzle.
 export type BackendPuzzle = z.infer<typeof backendPuzzleSchema>;
-
