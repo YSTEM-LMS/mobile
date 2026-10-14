@@ -7,7 +7,8 @@ export type Puzzle = {
   id: string;
   // Starting position in FEN notation.
   fen: string;
-  // Solution moves in order, as "from-square+to-square" ex. "c2d1".
+  // Moves in UCI notation ex. "c2d1".
+  // The first move is the opponent's setup move, solution starts from the second move.
   moves: string[];
   rating: number;
   ratingDeviation?: number;
