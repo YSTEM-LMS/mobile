@@ -13,16 +13,18 @@ export type FakePuzzleClientOptions = {
 
   /** Optional simulated request delay in milliseconds. */
   delayMs?: number;
-}
+};
 
 /**
  * Creates a fake puzzle API client using predefined response data.
  * Simulates successful requests, failed requests, and network delays.
- * 
+ *
  * @param options - Configuration for the fake client's behavior.
  * @returns A fake client implementing the PuzzleApiClient interface.
  */
-export function createFakePuzzleClient(options: FakePuzzleClientOptions = {}): PuzzleApiClient {
+export function createFakePuzzleClient(
+  options: FakePuzzleClientOptions = {},
+): PuzzleApiClient {
   const { response = rawPuzzleFixtures, error, delayMs = 0 } = options;
 
   return {
