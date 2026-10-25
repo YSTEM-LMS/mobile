@@ -1,79 +1,138 @@
-import { EnvironmentConfigError, parsePublicEnvironment } from '@/config/env';
+import {
+  env,
+  EnvironmentConfigError,
+  parsePublicEnvironment,
+} from '@/config/env';
+
+const validEnvironment = {
+  appEnv: 'development',
+  apiBaseUrl: 'https://api.example.org/v1/',
+  chessSocketUrl: 'https://chess.example.org/',
+  stockfishSocketUrl: 'https://stockfish.example.org/',
+};
+
+const serviceFields = [
+  'apiBaseUrl',
+  'chessSocketUrl',
+  'stockfishSocketUrl',
+] as const;
 
 describe('parsePublicEnvironment', () => {
   it.each(['development', 'preview', 'production'] as const)(
-    'accepts a valid %s environment',
+    'accepts a valid %s environment and normalizes trailing slashes',
     (appEnv) => {
-      expect(
-        parsePublicEnvironment({
-          appEnv,
-          apiBaseUrl: 'https://api.example.org/v1/',
-        }),
-      ).toEqual({
+      expect(parsePublicEnvironment({ ...validEnvironment, appEnv })).toEqual({
         appEnv,
         apiBaseUrl: 'https://api.example.org/v1',
+        chessSocketUrl: 'https://chess.example.org',
+        stockfishSocketUrl: 'https://stockfish.example.org',
       });
     },
   );
 
-  it('allows HTTP for local development', () => {
-    expect(
-      parsePublicEnvironment({
-        appEnv: 'development',
-        apiBaseUrl: 'http://10.0.2.2:8000',
-      }),
-    ).toEqual({
+  it('allows HTTP for all local services', () => {
+    const local = {
       appEnv: 'development',
       apiBaseUrl: 'http://10.0.2.2:8000',
-    });
+      chessSocketUrl: 'http://10.0.2.2:3001',
+      stockfishSocketUrl: 'http://10.0.2.2:8080',
+    };
+    expect(parsePublicEnvironment(local)).toEqual(local);
   });
 
-  it.each(['preview', 'production'] as const)(
-    'rejects HTTP for %s',
+  it('exposes the public service settings through the immutable env object', () => {
+    const expected = parsePublicEnvironment({
+      appEnv: process.env.EXPO_PUBLIC_APP_ENV,
+      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
+      chessSocketUrl: process.env.EXPO_PUBLIC_CHESS_SOCKET_URL,
+      stockfishSocketUrl: process.env.EXPO_PUBLIC_STOCKFISH_SOCKET_URL,
+    });
+    expect(env).toEqual(expected);
+    expect(Object.isFrozen(env)).toBe(true);
+  });
+
+  it('trims surrounding whitespace without removing service paths', () => {
+    expect(
+      parsePublicEnvironment({
+        ...validEnvironment,
+        chessSocketUrl: '  https://chess.example.org/game/  ',
+      }).chessSocketUrl,
+    ).toBe('https://chess.example.org/game');
+  });
+
+  it.each([undefined, '', 'staging'])(
+    'rejects invalid appEnv: %s',
     (appEnv) => {
       expect(() =>
-        parsePublicEnvironment({
-          appEnv,
-          apiBaseUrl: 'http://api.example.org',
-        }),
-      ).toThrow('apiBaseUrl must use HTTPS outside development');
+        parsePublicEnvironment({ ...validEnvironment, appEnv }),
+      ).toThrow('appEnv');
     },
   );
 
-  it.each([
-    [{ apiBaseUrl: 'https://api.example.org' }, 'appEnv'],
-    [{ appEnv: 'development' }, 'apiBaseUrl'],
-    [{ appEnv: 'staging', apiBaseUrl: 'https://api.example.org' }, 'appEnv'],
-    [{ appEnv: 'development', apiBaseUrl: 'not-a-url' }, 'apiBaseUrl'],
-  ])('rejects missing or malformed values', (input, expectedField) => {
-    expect(() => parsePublicEnvironment(input)).toThrow(EnvironmentConfigError);
-    expect(() => parsePublicEnvironment(input)).toThrow(expectedField);
-  });
+  describe.each(serviceFields)('%s', (field) => {
+    const protocol = 'https';
 
-  it('rejects credentials embedded in the API URL', () => {
-    expect(() =>
-      parsePublicEnvironment({
-        appEnv: 'development',
-        apiBaseUrl: 'https://user:password@api.example.org',
-      }),
-    ).toThrow('apiBaseUrl must not contain credentials');
-  });
+    it.each([undefined, '', '   ', 'not-a-url', 'https://'])(
+      'rejects a missing or malformed value: %s',
+      (value) => {
+        const parse = () =>
+          parsePublicEnvironment({ ...validEnvironment, [field]: value });
+        expect(parse).toThrow(EnvironmentConfigError);
+        expect(parse).toThrow(field);
+      },
+    );
 
-  it('rejects non-HTTP API URLs', () => {
-    expect(() =>
-      parsePublicEnvironment({
-        appEnv: 'development',
-        apiBaseUrl: 'ftp://api.example.org',
-      }),
-    ).toThrow('apiBaseUrl must use HTTP or HTTPS');
-  });
+    it.each(['preview', 'production'])(
+      'requires a secure protocol for %s',
+      (appEnv) => {
+        expect(() =>
+          parsePublicEnvironment({
+            ...validEnvironment,
+            appEnv,
+            [field]: 'http://service.example.org',
+          }),
+        ).toThrow(`${field} must use HTTPS outside development`);
+      },
+    );
 
-  it('rejects query strings and fragments in the API URL', () => {
-    expect(() =>
-      parsePublicEnvironment({
-        appEnv: 'development',
-        apiBaseUrl: 'https://api.example.org?token=public#section',
-      }),
-    ).toThrow('apiBaseUrl must not contain a query string or fragment');
+    it.each(['ftp', 'ws', 'wss'])(
+      'rejects the wrong protocol: %s',
+      (invalidProtocol) => {
+        expect(() =>
+          parsePublicEnvironment({
+            ...validEnvironment,
+            [field]: `${invalidProtocol}://service.example.org`,
+          }),
+        ).toThrow(`${field} must use HTTP or HTTPS`);
+      },
+    );
+
+    it.each(['user:private-password@', 'user@', ':private-password@'])(
+      'rejects embedded credentials without exposing them',
+      (credentials) => {
+        const parse = () =>
+          parsePublicEnvironment({
+            ...validEnvironment,
+            [field]: `${protocol}://${credentials}service.example.org`,
+          });
+        expect(parse).toThrow(`${field} must not contain credentials`);
+        expect(parse).not.toThrow('private-password');
+      },
+    );
+
+    it.each(['?token=private-token', '#section', '?', '#'])(
+      'rejects query strings or fragments: %s',
+      (suffix) => {
+        const parse = () =>
+          parsePublicEnvironment({
+            ...validEnvironment,
+            [field]: `${protocol}://service.example.org${suffix}`,
+          });
+        expect(parse).toThrow(
+          `${field} must not contain a query string or fragment`,
+        );
+        expect(parse).not.toThrow('private-token');
+      },
+    );
   });
 });

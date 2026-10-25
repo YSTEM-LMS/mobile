@@ -3,36 +3,19 @@ import { z } from 'zod';
 const publicEnvironmentSchema = z.object({
   appEnv: z.enum(['development', 'preview', 'production']),
   apiBaseUrl: z.string().trim().min(1).url(),
+  chessSocketUrl: z.string().trim().min(1).url(),
+  stockfishSocketUrl: z.string().trim().min(1).url(),
 });
-
-export type AppEnvironment = z.infer<typeof publicEnvironmentSchema>['appEnv'];
-
-export interface PublicEnvironment {
-  appEnv: AppEnvironment;
-  apiBaseUrl: string;
-}
 
 export class EnvironmentConfigError extends Error {
   constructor(message: string) {
-    super(message);
+    super(`Invalid public environment configuration: ${message}`);
     this.name = 'EnvironmentConfigError';
   }
 }
 
-interface PublicEnvironmentInput {
-  appEnv?: string;
-  apiBaseUrl?: string;
-}
-
-function invalidConfiguration(details: string): EnvironmentConfigError {
-  return new EnvironmentConfigError(
-    `Invalid public environment configuration: ${details}`,
-  );
-}
-
-export function parsePublicEnvironment(
-  input: PublicEnvironmentInput,
-): PublicEnvironment {
+export function parsePublicEnvironment(input: unknown) {
+  // Check required values and URL syntax first.
   const result = publicEnvironmentSchema.safeParse(input);
 
   if (!result.success) {
@@ -43,36 +26,51 @@ export function parsePublicEnvironment(
       })
       .join('; ');
 
-    throw invalidConfiguration(details);
+    throw new EnvironmentConfigError(details);
   }
 
-  const apiUrl = new URL(result.data.apiBaseUrl);
+  const config = result.data;
 
-  if (apiUrl.protocol !== 'http:' && apiUrl.protocol !== 'https:') {
-    throw invalidConfiguration('apiBaseUrl must use HTTP or HTTPS');
-  }
+  // Apply the same service-address rules to each URL.
+  function checkUrl(value: string, field: string) {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new EnvironmentConfigError(`${field} must use HTTP or HTTPS`);
+    }
 
-  if (result.data.appEnv !== 'development' && apiUrl.protocol !== 'https:') {
-    throw invalidConfiguration('apiBaseUrl must use HTTPS outside development');
-  }
+    if (config.appEnv !== 'development' && url.protocol !== 'https:') {
+      throw new EnvironmentConfigError(
+        `${field} must use HTTPS outside development`,
+      );
+    }
 
-  if (apiUrl.username || apiUrl.password) {
-    throw invalidConfiguration('apiBaseUrl must not contain credentials');
-  }
+    if (url.username || url.password) {
+      throw new EnvironmentConfigError(`${field} must not contain credentials`);
+    }
 
-  if (apiUrl.search || apiUrl.hash) {
-    throw invalidConfiguration(
-      'apiBaseUrl must not contain a query string or fragment',
-    );
+    if (value.includes('?') || value.includes('#')) {
+      throw new EnvironmentConfigError(
+        `${field} must not contain a query string or fragment`,
+      );
+    }
+
+    return url.toString().replace(/\/+$/, '');
   }
 
   return Object.freeze({
-    appEnv: result.data.appEnv,
-    apiBaseUrl: apiUrl.toString().replace(/\/+$/, ''),
+    appEnv: config.appEnv,
+    apiBaseUrl: checkUrl(config.apiBaseUrl, 'apiBaseUrl'),
+    chessSocketUrl: checkUrl(config.chessSocketUrl, 'chessSocketUrl'),
+    stockfishSocketUrl: checkUrl(
+      config.stockfishSocketUrl,
+      'stockfishSocketUrl',
+    ),
   });
 }
 
 export const env = parsePublicEnvironment({
   appEnv: process.env.EXPO_PUBLIC_APP_ENV,
   apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
+  chessSocketUrl: process.env.EXPO_PUBLIC_CHESS_SOCKET_URL,
+  stockfishSocketUrl: process.env.EXPO_PUBLIC_STOCKFISH_SOCKET_URL,
 });
