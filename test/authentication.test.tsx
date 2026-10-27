@@ -274,4 +274,54 @@ describe('authentication', () => {
     act(() => router.push('/profile'));
     await waitFor(() => expect(renderedRouter.getPathname()).toBe('/sign-in'));
   });
+
+  it('Sign Out from the error screen allows retry after failure.', async () => {
+    let savedToken: string | null = studentToken;
+
+    jest
+      .spyOn(tokenStore, 'getToken')
+      .mockImplementation(async () => savedToken);
+
+    jest
+      .spyOn(authGateway, 'validate')
+      .mockRejectedValue(
+        new AppError('NETWORK_ERROR', 'Unable to connect to the server.'),
+      );
+
+    const deleteToken = jest
+      .spyOn(tokenStore, 'deleteToken')
+      .mockRejectedValueOnce(
+        new AppError('UNKNOWN', 'Sign out failed. Please try again.'),
+      )
+      .mockImplementationOnce(async () => {
+        savedToken = null;
+      });
+
+    const renderedRouter = renderRouter('./app', { initialUrl: '/sign-in' });
+
+    await screen.findByTestId('session-error-screen');
+    fireEvent.press(screen.getByRole('button', { name: 'Sign Out' }));
+
+    const loadingButton = screen.getByRole('button', {
+      name: 'Signing out',
+      busy: true,
+    });
+    expect(loadingButton).toBeDisabled();
+
+    fireEvent.press(loadingButton);
+    await waitFor(() => expect(deleteToken).toHaveBeenCalledTimes(1));
+
+    expect(
+      await screen.findByText('Unable to sign out. Please try again.'),
+    ).toBeOnTheScreen();
+
+    const retryButton = screen.getByRole('button', { name: 'Sign Out' });
+    expect(retryButton).toBeEnabled();
+    fireEvent.press(retryButton);
+
+    expect(await screen.findByText('Welcome back')).toBeOnTheScreen();
+    expect(renderedRouter.getPathname()).toBe('/sign-in');
+    expect(deleteToken).toHaveBeenCalledTimes(2);
+    expect(savedToken).toBeNull();
+  });
 });
