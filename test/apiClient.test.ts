@@ -185,6 +185,26 @@ describe('ApiClient', () => {
     });
   });
 
+  it('throws timeout error while waiting for token provider', async () => {
+    const tokenProvider = jest.fn(() => new Promise<string | null>(() => {}));
+    const authenticatedTimeoutClient = createApiClient({
+      baseUrl: 'https://api.example.com',
+      timeoutMs: 1,
+      tokenProvider,
+    });
+
+    await expect(
+      authenticatedTimeoutClient.get('/protected'),
+    ).rejects.toMatchObject({
+      name: 'AppError',
+      code: 'REQUEST_TIMEOUT',
+      message: 'The request took too long to complete.',
+    });
+
+    expect(tokenProvider).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
   it('throws invalid response error', async () => {
     mockedFetch.mockResolvedValue({
       ok: true,
@@ -230,5 +250,28 @@ describe('ApiClient', () => {
     controller.abort();
 
     await requestExpectation;
+  });
+
+  it('throws cancel error while waiting for token provider', async () => {
+    const tokenProvider = jest.fn(() => new Promise<string | null>(() => {}));
+    const authenticatedClient = createApiClient({
+      baseUrl: 'https://api.example.com',
+      timeoutMs: 10_000,
+      tokenProvider,
+    });
+
+    const controller = new AbortController();
+    const requestExpectation = expect(
+      authenticatedClient.get('/items', { signal: controller.signal }),
+    ).rejects.toMatchObject({
+      name: 'AppError',
+      code: 'REQUEST_CANCEL',
+      message: 'The request was cancelled.',
+    });
+
+    controller.abort();
+    await requestExpectation;
+    expect(tokenProvider).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });
