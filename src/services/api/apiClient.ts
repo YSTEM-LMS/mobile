@@ -40,18 +40,6 @@ class ApiClient implements ApiClientInterface {
     options: RequestInit,
   ): Promise<T | null> {
     const url = `${this.apiBaseUrl}${endpoint}`;
-    const token = await this.getToken();
-
-    const headers = new Headers(this.defaultHeaders);
-    new Headers(options.headers).forEach((value, key) => {
-      headers.set(key, value);
-    });
-
-    headers.set('Accept', 'application/json');
-
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
 
     const controller = new AbortController();
     let abortReason: 'timeout' | 'cancel' | null = null;
@@ -80,7 +68,36 @@ class ApiClient implements ApiClientInterface {
       abortRequest('timeout');
     }, this.timeoutMs);
 
+    let handleAbort: (() => void) | undefined;
+
+    const abortPromise = new Promise<never>((_resolve, reject) => {
+      handleAbort = () => {
+        reject(new Error('Request aborted'));
+      };
+
+      if (controller.signal.aborted) {
+        handleAbort();
+      } else {
+        controller.signal.addEventListener('abort', handleAbort, {
+          once: true,
+        });
+      }
+    });
+
     try {
+      // Race that allow abort process to concurrently run, even if the token process hangs
+      const token = await Promise.race([this.getToken(), abortPromise]);
+      const headers = new Headers(this.defaultHeaders);
+
+      new Headers(options.headers).forEach((value, key) => {
+        headers.set(key, value);
+      });
+
+      headers.set('Accept', 'application/json');
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+
       const response = await fetch(url, {
         ...options,
         headers,
@@ -147,6 +164,10 @@ class ApiClient implements ApiClientInterface {
     } finally {
       clearTimeout(timeoutId);
       options.signal?.removeEventListener('abort', handleCancellation);
+
+      if (handleAbort) {
+        controller.signal.removeEventListener('abort', handleAbort);
+      }
     }
   }
 
