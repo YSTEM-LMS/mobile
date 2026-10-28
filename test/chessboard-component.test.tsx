@@ -1,5 +1,6 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { ChessBoard_component } from '@/components/chess/Chessboard-component';
+import { StyleSheet } from 'react-native';
 
 const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
@@ -25,30 +26,40 @@ describe('ChessBoard_component', () => {
   });
 
   test('White orientation renders correctly', () => {
-    const { getByLabelText } = render(
+    const { getAllByLabelText } = render(
       <ChessBoard_component fen={STARTING_FEN} orientation="white" />,
     );
 
-    expect(getByLabelText('Chess square a8')).toBeTruthy();
-    expect(getByLabelText('Chess square h1')).toBeTruthy();
+    const squares = getAllByLabelText(/^Chess square /);
+    expect(squares).toHaveLength(64);
+    expect(squares[0].props.accessibilityLabel).toBe('Chess square a8');
+    expect(squares[63].props.accessibilityLabel).toBe('Chess square h1');
   });
 
   test('Black orientation renders correctly', () => {
-    const { getByLabelText } = render(
+    const { getAllByLabelText } = render(
       <ChessBoard_component fen={STARTING_FEN} orientation="black" />,
     );
 
-    expect(getByLabelText('Chess square h1')).toBeTruthy();
-    expect(getByLabelText('Chess square a8')).toBeTruthy();
+    const squares = getAllByLabelText(/^Chess square /);
+    expect(squares).toHaveLength(64);
+    expect(squares[0].props.accessibilityLabel).toBe('Chess square h1');
+    expect(squares[63].props.accessibilityLabel).toBe('Chess square a8');
   });
 
   test('Selecting a piece highlights legal destinations', () => {
-    const { getByLabelText } = render(
-      <ChessBoard_component fen={STARTING_FEN} />,
-    );
+    const { getByLabelText, getByTestId, queryByTestId, queryAllByTestId } =
+      render(<ChessBoard_component fen={STARTING_FEN} />);
+
+    // No indicators before anything is selected.
+    expect(queryAllByTestId(/^legal-move-/)).toHaveLength(0);
 
     // Select the white pawn on e2.
     fireEvent.press(getByLabelText('Chess square e2'));
+
+    expect(getByTestId('legal-move-e3')).toBeTruthy();
+    expect(getByTestId('legal-move-e4')).toBeTruthy();
+    expect(queryByTestId('legal-move-e5')).toBeNull();
   });
 
   test('Illegal moves are rejected', () => {
@@ -102,8 +113,13 @@ describe('ChessBoard_component', () => {
       />,
     );
 
-    expect(getByLabelText('Chess square e2')).toBeTruthy();
-    expect(getByLabelText('Chess square e4')).toBeTruthy();
+    const background = (label: string) =>
+      StyleSheet.flatten(getByLabelText(label).props.style).backgroundColor;
+
+    expect(background('Chess square e2')).toBe('#C9D957');
+    expect(background('Chess square e4')).toBe('#C9D957');
+    // d4 is unrelated to the last move.
+    expect(background('Chess square d4')).not.toBe('#C9D957');
   });
 
   test('Invalid FEN produces a safe error state', () => {

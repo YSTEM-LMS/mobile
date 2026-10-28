@@ -208,7 +208,11 @@ export function ChessBoard_component({
                 )}
 
                 {isLegalDestination && (
-                  <View pointerEvents="none" style={styles.legalMoveDot} />
+                  <View
+                    pointerEvents="none"
+                    testID={`legal-move-${square}`}
+                    style={styles.legalMoveDot}
+                  />
                 )}
               </Pressable>
             );

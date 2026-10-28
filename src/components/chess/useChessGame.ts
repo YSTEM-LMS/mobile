@@ -16,6 +16,7 @@ export function useChessGame(initialFen: string) {
       game.move({
         from,
         to,
+        promotion: 'q',
       });
 
       const nextPosition = game.fen();
