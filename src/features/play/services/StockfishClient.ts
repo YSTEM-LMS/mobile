@@ -6,7 +6,9 @@ import { env } from '@/config/env';
 export type StockfishLevel = 1 | 2 | 3 | 4 | 5;
 
 /**
- * The engine's reply move in UCI format (e.g. "e7e5", promotions like "e7e8q").
+ * The engine's reply move in UCI format (e.g. "e7e5", promotions like "e7e8q"),
+ * or `null` when the engine has no legal move (checkmate or stalemate; the
+ * server sends "(none)").
  *
  * The server's `newFEN` field is deliberately not exposed: when a player move
  * is sent, the server applies the engine's reply to the position *before* the
@@ -14,7 +16,7 @@ export type StockfishLevel = 1 | 2 | 3 | 4 | 5;
  * instead, as the website does. See docs/stockfish-socket-contract.md.
  */
 export interface EngineMove {
-  move: string;
+  move: string | null;
 }
 
 export interface StockfishClient {
@@ -82,11 +84,23 @@ const sessionStartedSchema = z.object({
   success: z.literal(true),
 });
 
+// Stockfish's `bestmove (none)`: the side to move has no legal moves.
+const NO_LEGAL_MOVE = '(none)';
+
+// A UCI move such as "e2e4", or a promotion such as "e7e8q" / "e2e1n". Only a
+// pawn on its seventh rank can promote, so promotions go 7->8 or 2->1.
+const UCI_MOVE = /^(?:[a-h][1-8][a-h][1-8]|[a-h](?:7[a-h]8|2[a-h]1)[qrbn])$/;
+
 // Only the fields the client uses are validated. `newFEN` and `moveDetails`
 // are unreliable when a player move is sent (see EngineMove) and are ignored.
 const evaluationCompleteSchema = z.object({
   mode: z.literal('move'),
-  move: z.string().min(1),
+  move: z
+    .string()
+    .refine(
+      (move) => move === NO_LEGAL_MOVE || UCI_MOVE.test(move),
+      `expected a UCI move (e.g. "e7e5" or "e7e8q") or "${NO_LEGAL_MOVE}"`,
+    ),
 });
 
 function describeIssues(error: z.ZodError): string {
@@ -111,7 +125,8 @@ function parseEvaluationComplete(payload: unknown): EngineMove {
       `Invalid evaluation-complete payload: ${describeIssues(result.error)}`,
     );
   }
-  return { move: result.data.move };
+  const { move } = result.data;
+  return { move: move === NO_LEGAL_MOVE ? null : move };
 }
 
 /** Turns a failure event's payload into a readable message. */
@@ -146,6 +161,8 @@ interface ReplyOptions<T> {
   /** Every in-flight wait registers here so disconnect() can cancel it. */
   cancellers: Set<Canceller>;
   parse: (payload: unknown) => T;
+  /** Runs after the listeners are removed and before the promise rejects. */
+  onTimeout?: (error: StockfishClientError) => void;
 }
 
 /**
@@ -163,6 +180,7 @@ function waitForReply<T>({
   timeoutMs,
   cancellers,
   parse,
+  onTimeout,
 }: ReplyOptions<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -204,11 +222,11 @@ function waitForReply<T>({
 
     timer = setTimeout(() => {
       cleanup();
-      reject(
-        new StockfishClientError(
-          `Timed out after ${timeoutMs} ms waiting for ${successEvent}`,
-        ),
+      const error = new StockfishClientError(
+        `Timed out after ${timeoutMs} ms waiting for ${successEvent}`,
       );
+      onTimeout?.(error);
+      reject(error);
     }, timeoutMs);
   });
 }
@@ -225,7 +243,43 @@ export function createStockfishClient({
   let session: Promise<void> | null = null;
   let sessionReady = false;
   let pending = false;
+  let stopWatchingSession: (() => void) | null = null;
   const cancellers = new Set<Canceller>();
+
+  /**
+   * Abandons the socket and session and rejects everything still waiting.
+   * Replies carry no request ID, so once a reply goes missing (a timeout) or
+   * the session fails, the old socket cannot be trusted. The next
+   * startSession() opens a fresh socket and session.
+   */
+  function reset(reason: Error): void {
+    const current = socket;
+
+    socket = null;
+    connecting = null;
+    session = null;
+    sessionReady = false;
+    stopWatchingSession?.();
+    stopWatchingSession = null;
+
+    [...cancellers].forEach((cancel) => cancel(reason));
+
+    current?.disconnect();
+  }
+
+  /**
+   * The server can emit session-error after session-started (e.g. when the
+   * engine fails to launch), so keep listening while the session is in use.
+   */
+  function watchSession(current: StockfishSocket): void {
+    const onSessionError: SocketListener = (payload) => {
+      reset(
+        new StockfishClientError(describeFailure('session-error', payload)),
+      );
+    };
+    current.on('session-error', onSessionError);
+    stopWatchingSession = () => current.off('session-error', onSessionError);
+  }
 
   function ensureConnected(): Promise<StockfishSocket> {
     if (!socket) {
@@ -286,10 +340,17 @@ export function createStockfishClient({
       sessionType: 'player-vs-computer',
       fen: 'start',
     });
-    await reply;
+    await reply.catch((error: Error) => {
+      // After a timeout the server may still create the session, and a retry
+      // on this socket would fail with "Session already exists!". Retry on a
+      // fresh socket instead.
+      if (socket === current) reset(error);
+      throw error;
+    });
 
     if (socket === current) {
       sessionReady = true;
+      watchSession(current);
     }
   }
 
@@ -297,8 +358,11 @@ export function createStockfishClient({
     // The connection dropped since the last session: the server has already
     // deleted that session, so start over.
     if (sessionReady && !socket?.connected) {
-      session = null;
-      sessionReady = false;
+      reset(
+        new StockfishClientError(
+          'Connection to the Stockfish server was lost.',
+        ),
+      );
     }
 
     // The server rejects a second start-session on the same socket, so
@@ -358,6 +422,9 @@ export function createStockfishClient({
         timeoutMs,
         cancellers,
         parse: parseEvaluationComplete,
+        // A late reply would be matched to the next request, so abandon this
+        // socket. Callers start a new session before requesting again.
+        onTimeout: reset,
       });
       // Difficulty maps directly to the server's search depth (level 3 means
       // `go depth 3`), as confirmed by the team, so it is sent unchanged.
@@ -369,18 +436,7 @@ export function createStockfishClient({
   }
 
   function disconnect(): void {
-    const current = socket;
-
-    socket = null;
-    connecting = null;
-    session = null;
-    sessionReady = false;
-
-    // Reject everything still waiting and remove its listeners.
-    const error = new StockfishClientError('Stockfish client disconnected.');
-    [...cancellers].forEach((cancel) => cancel(error));
-
-    current?.disconnect();
+    reset(new StockfishClientError('Stockfish client disconnected.'));
   }
 
   return { startSession, requestMove, disconnect };

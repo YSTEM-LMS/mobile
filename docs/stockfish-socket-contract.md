@@ -65,7 +65,9 @@ Replies:
 
 If the Stockfish binary fails to launch, the server emits `session-error`
 (`"Chess engine failed to start"`) **after** `session-started` has already
-been sent.
+been sent. The mobile client keeps listening for `session-error` while a
+session is in use and invalidates the session when it arrives (see
+[Recovery](#recovery)).
 
 ### `evaluate-fen`
 
@@ -146,7 +148,8 @@ server-internal analysis sessions. `start-session` cannot enable it.
   to their own board, and `newFEN` and `moveDetails` are ignored.
 - **No legal moves.** In checkmate or stalemate, Stockfish answers
   `bestmove (none)`. This arrives as `evaluation-complete` with
-  `move: '(none)'` and `moveDetails: null`, not as `evaluation-error`.
+  `move: '(none)'` and `moveDetails: null`, not as `evaluation-error`. The
+  mobile client returns `{ move: null }` for it, never `'(none)'`.
 
 ### `evaluation-error`
 
@@ -164,18 +167,42 @@ session, and a new `evaluate-fen` resets the previous one. The mobile client
 therefore allows only one request at a time and rejects a second call while
 the first is pending.
 
+A request that times out may still be answered later, and that late reply
+would look like the answer to the next request. The client therefore abandons
+the socket on a timeout (see [Recovery](#recovery)).
+
+## Recovery
+
+The client **resets** (closes the socket, forgets the session, and rejects
+anything still pending) when:
+
+| Situation                                                  | Why                                                                                                   |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `requestMove()` times out                                  | A late `evaluation-complete` would otherwise resolve the next request                                 |
+| `session-error` arrives after `session-started`            | The session is unusable (e.g. the engine failed to launch)                                            |
+| `startSession()` fails (timeout, `session-error`, invalid) | The server may still hold a session on that socket, so a retry there gets `"Session already exists!"` |
+| `startSession()` finds the connection dropped              | The server deleted the session on disconnect                                                          |
+
+After a reset, `requestMove()` rejects until `startSession()` succeeds again,
+which always connects a fresh socket. Disconnecting the old socket also makes
+the server delete any session it still holds.
+
 ## How the mobile client uses this contract
 
-| Client method    | Emits                                      | Resolves on                       | Rejects on                                                                                    |
-| ---------------- | ------------------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------- |
-| `startSession()` | `start-session` (after a lazy connect)     | `session-started` (validated)     | `connect_error`, `session-error`, `disconnect`, timeout                                       |
-| `requestMove()`  | `evaluate-fen` with `{ fen, move, level }` | `evaluation-complete` (validated) | invalid level, no session, request already pending, `evaluation-error`, `disconnect`, timeout |
-| `disconnect()`   | none (closes the socket)                   | n/a                               | Rejects anything still pending and removes all listeners                                      |
+| Client method    | Emits                                      | Resolves on                       | Rejects on                                                                                                                   |
+| ---------------- | ------------------------------------------ | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `startSession()` | `start-session` (after a lazy connect)     | `session-started` (validated)     | `connect_error`, `session-error`, `disconnect`, timeout                                                                      |
+| `requestMove()`  | `evaluate-fen` with `{ fen, move, level }` | `evaluation-complete` (validated) | invalid level, no session, request already pending, invalid move, `evaluation-error`, `session-error`, `disconnect`, timeout |
+| `disconnect()`   | none (closes the socket)                   | n/a                               | Rejects anything still pending and removes all listeners                                                                     |
 
 - Each reply has a 10 second timeout (`timeoutMs`).
-- `requestMove()` resolves with `{ move }` only (UCI). The client validates
+- `requestMove()` resolves with `{ move }` only. The client validates
   `mode: 'move'` and `move` with zod, and ignores `newFEN` and `moveDetails`
   (see Caveats). Callers apply the move to their own board.
+- `move` must be a UCI move (`e7e5`) or a promotion from the seventh rank
+  (`e7e8q`, `e2e1n`; pieces `q`, `r`, `b`, `n`, lowercase), or `'(none)'`.
+  Anything else rejects with `Invalid evaluation-complete payload`.
+  `'(none)'` resolves as `{ move: null }`: the engine has no legal move.
 - Screens never touch the socket. They use the `StockfishClient` interface.
 
 ## Unresolved
@@ -186,6 +213,5 @@ the first is pending.
 - **Rate limits: none on the socket.** `express-rate-limit` is listed in the
   server's `package.json` but is not applied. Each session spawns a Stockfish
   process, so connection or session limits are an open server-side question.
-- **`(none)` moves** at game end are not yet handled specially by the client.
 - **Staging and production URLs** for the Stockfish server are not yet
   provided.

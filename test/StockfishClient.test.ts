@@ -22,6 +22,11 @@ const ENGINE_REPLY = {
   newFEN: START_FEN,
 };
 
+const MOVE_REQUEST = { fen: START_FEN, move: 'e2e4', level: 3 } as const;
+
+// While a session is in use, the client keeps one session-error listener.
+const SESSION_WATCHER = 1;
+
 /**
  * Lets pending promise callbacks run. Uses the real setImmediate so it still
  * works while Jest's fake timers are active.
@@ -44,6 +49,35 @@ function setup() {
     timeoutMs: TIMEOUT_MS,
   });
   return { socket, createSocket, client };
+}
+
+/** Like setup(), but every connection gets its own FakeSocket, as in the app. */
+function setupWithFreshSockets() {
+  const sockets: FakeSocket[] = [];
+  const client = createStockfishClient({
+    url: 'http://stockfish.test',
+    createSocket: () => {
+      const created = new FakeSocket();
+      sockets.push(created);
+      return created;
+    },
+    timeoutMs: TIMEOUT_MS,
+  });
+  return { sockets, client };
+}
+
+/** startSession() for setupWithFreshSockets(); returns the session's socket. */
+async function startFreshSession(
+  client: StockfishClient,
+  sockets: FakeSocket[],
+): Promise<FakeSocket> {
+  const started = client.startSession();
+  const socket = sockets[sockets.length - 1];
+  socket.simulateConnect();
+  await flushPromises();
+  socket.serverEmit('session-started', { success: true, id: 'socket-id' });
+  await started;
+  return socket;
 }
 
 /** Plays the server's side of a successful connect + start-session. */
@@ -151,7 +185,7 @@ describe('createStockfishClient: startSession', () => {
     expect(createSocket).toHaveBeenCalledTimes(1);
     expect(socket.connectCalls).toBe(1);
     expect(socket.payloadsFor('start-session')).toHaveLength(1);
-    expect(socket.listenerCount()).toBe(0);
+    expect(socket.listenerCount()).toBe(SESSION_WATCHER);
   });
 
   it('rejects when the server cannot start a session', async () => {
@@ -257,7 +291,7 @@ describe('createStockfishClient: requestMove', () => {
     socket.serverEmit('evaluation-complete', ENGINE_REPLY);
 
     await expect(result).resolves.toEqual({ move: 'e7e5' });
-    expect(socket.listenerCount()).toBe(0);
+    expect(socket.listenerCount()).toBe(SESSION_WATCHER);
   });
 
   it('rejects a malformed evaluation-complete payload', async () => {
@@ -272,7 +306,7 @@ describe('createStockfishClient: requestMove', () => {
     socket.serverEmit('evaluation-complete', { mode: 'move' });
 
     await expect(result).rejects.toThrow('Invalid evaluation-complete payload');
-    expect(socket.listenerCount()).toBe(0);
+    expect(socket.listenerCount()).toBe(SESSION_WATCHER);
   });
 
   it('rejects when the server reports an evaluation error', async () => {
@@ -289,7 +323,7 @@ describe('createStockfishClient: requestMove', () => {
     });
 
     await expect(result).rejects.toThrow('Invalid move from engine');
-    expect(socket.listenerCount()).toBe(0);
+    expect(socket.listenerCount()).toBe(SESSION_WATCHER);
   });
 
   it('rejects on timeout and removes its listeners', async () => {
@@ -346,7 +380,179 @@ describe('createStockfishClient: requestMove', () => {
       await result;
     }
 
+    expect(socket.listenerCount()).toBe(SESSION_WATCHER);
+  });
+});
+
+describe('createStockfishClient: move validation', () => {
+  it.each(['e7e5', 'g8f6', 'e1g1', 'e7e8q', 'a7b8r', 'c2c1b', 'h2h1n'])(
+    'accepts the UCI move %p',
+    async (move) => {
+      const { client, socket } = setup();
+      await startSession(client, socket);
+
+      const result = client.requestMove(MOVE_REQUEST);
+      socket.serverEmit('evaluation-complete', { ...ENGINE_REPLY, move });
+
+      await expect(result).resolves.toEqual({ move });
+    },
+  );
+
+  it.each([
+    '',
+    'e7',
+    'e7e5 ',
+    'E7E5',
+    'e9e5',
+    'i7i5',
+    'e7e8k',
+    'e7e8Q',
+    'e6e7q', // promotion must land on the last rank
+    'e7e5d7d5',
+    '0000',
+    'none',
+  ])('rejects the malformed move %p', async (move) => {
+    const { client, socket } = setup();
+    await startSession(client, socket);
+
+    const result = client.requestMove(MOVE_REQUEST);
+    socket.serverEmit('evaluation-complete', { ...ENGINE_REPLY, move });
+
+    await expect(result).rejects.toThrow(StockfishClientError);
+    await expect(result).rejects.toThrow('Invalid evaluation-complete payload');
+  });
+
+  it('returns null instead of "(none)" when the engine has no legal move', async () => {
+    const { client, socket } = setup();
+    await startSession(client, socket);
+
+    const result = client.requestMove(MOVE_REQUEST);
+    socket.serverEmit('evaluation-complete', {
+      ...ENGINE_REPLY,
+      move: '(none)',
+    });
+
+    await expect(result).resolves.toEqual({ move: null });
+  });
+});
+
+describe('createStockfishClient: recovery', () => {
+  it('abandons the socket after a move request times out', async () => {
+    jest.useFakeTimers();
+    const { client, sockets } = setupWithFreshSockets();
+    const first = await startFreshSession(client, sockets);
+
+    const timedOut = client.requestMove(MOVE_REQUEST);
+    const assertion = expect(timedOut).rejects.toThrow('Timed out');
+    jest.advanceTimersByTime(TIMEOUT_MS);
+    await assertion;
+
+    expect(first.disconnectCalls).toBe(1);
+    expect(first.listenerCount()).toBe(0);
+    await expect(client.requestMove(MOVE_REQUEST)).rejects.toThrow(
+      'Call startSession()',
+    );
+    expect(first.payloadsFor('evaluate-fen')).toHaveLength(1);
+  });
+
+  it('does not match a late reply to a newer request after a timeout', async () => {
+    jest.useFakeTimers();
+    const { client, sockets } = setupWithFreshSockets();
+    const first = await startFreshSession(client, sockets);
+
+    const timedOut = client.requestMove(MOVE_REQUEST);
+    const assertion = expect(timedOut).rejects.toThrow('Timed out');
+    jest.advanceTimersByTime(TIMEOUT_MS);
+    await assertion;
+
+    const second = await startFreshSession(client, sockets);
+    const result = client.requestMove({ ...MOVE_REQUEST, move: 'd2d4' });
+
+    // The engine's late answer to e2e4 must not resolve the d2d4 request.
+    first.serverEmit('evaluation-complete', ENGINE_REPLY);
+    second.serverEmit('evaluation-complete', { ...ENGINE_REPLY, move: 'd7d5' });
+
+    await expect(result).resolves.toEqual({ move: 'd7d5' });
+  });
+
+  it('invalidates the session on a session-error after session-started', async () => {
+    const { client, sockets } = setupWithFreshSockets();
+    const first = await startFreshSession(client, sockets);
+
+    first.serverEmit('session-error', {
+      error: 'Chess engine failed to start',
+    });
+
+    expect(first.disconnectCalls).toBe(1);
+    expect(first.listenerCount()).toBe(0);
+    await expect(client.requestMove(MOVE_REQUEST)).rejects.toThrow(
+      'Call startSession()',
+    );
+
+    const second = await startFreshSession(client, sockets);
+    const result = client.requestMove(MOVE_REQUEST);
+    second.serverEmit('evaluation-complete', ENGINE_REPLY);
+
+    await expect(result).resolves.toEqual({ move: 'e7e5' });
+    expect(first.payloadsFor('start-session')).toHaveLength(1);
+    expect(second.payloadsFor('start-session')).toHaveLength(1);
+  });
+
+  it('rejects a pending move request when the session fails', async () => {
+    const { client, sockets } = setupWithFreshSockets();
+    const socket = await startFreshSession(client, sockets);
+
+    const result = client.requestMove(MOVE_REQUEST);
+    socket.serverEmit('session-error', {
+      error: 'Chess engine failed to start',
+    });
+
+    await expect(result).rejects.toThrow('Chess engine failed to start');
     expect(socket.listenerCount()).toBe(0);
+  });
+
+  it('retries on a fresh socket after the session start times out', async () => {
+    jest.useFakeTimers();
+    const { client, sockets } = setupWithFreshSockets();
+
+    const started = client.startSession();
+    sockets[0].simulateConnect();
+    await flushPromises();
+    const assertion = expect(started).rejects.toThrow('Timed out');
+    jest.advanceTimersByTime(TIMEOUT_MS);
+    await assertion;
+
+    // The server may still create the session on the old socket. Retrying
+    // there would fail with "Session already exists!", so it is abandoned.
+    expect(sockets[0].disconnectCalls).toBe(1);
+    sockets[0].serverEmit('session-started', { success: true, id: 'late' });
+
+    const second = await startFreshSession(client, sockets);
+    const result = client.requestMove(MOVE_REQUEST);
+    second.serverEmit('evaluation-complete', ENGINE_REPLY);
+
+    await expect(result).resolves.toEqual({ move: 'e7e5' });
+    expect(sockets).toHaveLength(2);
+    expect(sockets[0].payloadsFor('start-session')).toHaveLength(1);
+    expect(sockets[0].listenerCount()).toBe(0);
+  });
+
+  it('retries on a fresh socket after the server rejects the session', async () => {
+    const { client, sockets } = setupWithFreshSockets();
+
+    const started = client.startSession();
+    sockets[0].simulateConnect();
+    await flushPromises();
+    sockets[0].serverEmit('session-error', {
+      error: 'Session already exists!',
+    });
+    await expect(started).rejects.toThrow('Session already exists!');
+
+    const second = await startFreshSession(client, sockets);
+
+    expect(sockets).toHaveLength(2);
+    expect(sockets[0].disconnectCalls).toBe(1);
+    expect(second.payloadsFor('start-session')).toHaveLength(1);
   });
 });
 
@@ -400,31 +606,11 @@ describe('createStockfishClient: disconnect', () => {
   });
 
   it('creates a fresh socket for a new session after disconnecting', async () => {
-    const sockets: FakeSocket[] = [];
-    const client = createStockfishClient({
-      url: 'http://stockfish.test',
-      createSocket: () => {
-        const created = new FakeSocket();
-        sockets.push(created);
-        return created;
-      },
-      timeoutMs: TIMEOUT_MS,
-    });
-
-    // The socket is only created once startSession() runs, so play the
-    // server's side by hand instead of using the startSession helper.
-    const started = client.startSession();
-    sockets[0].simulateConnect();
-    await flushPromises();
-    sockets[0].serverEmit('session-started', { success: true, id: 'socket-1' });
-    await started;
+    const { client, sockets } = setupWithFreshSockets();
+    await startFreshSession(client, sockets);
 
     client.disconnect();
-    const restarted = client.startSession();
-    sockets[1].simulateConnect();
-    await flushPromises();
-    sockets[1].serverEmit('session-started', { success: true, id: 'socket-2' });
-    await restarted;
+    await startFreshSession(client, sockets);
 
     expect(sockets).toHaveLength(2);
     expect(sockets[0].listenerCount()).toBe(0);
