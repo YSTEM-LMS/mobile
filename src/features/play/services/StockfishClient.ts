@@ -314,6 +314,7 @@ export function createStockfishClient({
     return session;
   }
 
+  // Returns an engine move promise based on the current board state and difficulty level.
   async function requestMove({
     fen,
     move,

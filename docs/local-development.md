@@ -180,6 +180,41 @@ Leave the terminal running while developing.
 
 ## Daily use
 
+### Configure the backend services
+
+Copy `.env.example` to `.env.local` if you have not already created it. The
+Android emulator examples are:
+
+```text
+EXPO_PUBLIC_APP_ENV=development
+EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8000
+EXPO_PUBLIC_CHESS_SOCKET_URL=http://10.0.2.2:3001
+EXPO_PUBLIC_STOCKFISH_SOCKET_URL=http://10.0.2.2:8080
+```
+
+- `API_BASE_URL` points to the main API for accounts and learning data.
+- `CHESS_SOCKET_URL` points to the live chess service.
+- `STOCKFISH_SOCKET_URL` points to the computer opponent's engine service.
+- `APP_ENV` selects the URL validation rules. Development accepts HTTP/HTTPS
+  for all services; preview and production require HTTPS.
+
+`10.0.2.2` reaches the development computer from the standard Android emulator.
+For an iOS simulator on the same Mac, replace it with `localhost`. For a
+physical phone, use the development computer's LAN address. Keep the protocol
+and port appropriate to each service; the ports above are examples.
+
+All settings must be present even when a service is not running. A valid
+address does not start a server or prove connectivity. If you already have an
+`.env.local`, add the two socket settings; do not overwrite your existing API
+address. Restart Expo after changing the file (`npx expo start --clear` if it
+keeps using old values).
+
+Every `EXPO_PUBLIC_` value is visible in the built app. Use only public
+configuration, never passwords, tokens, database credentials, or other secrets.
+See [Environment configuration](environments.md) for the complete rules.
+
+### Run the app
+
 Start your virtual phone, open a terminal in the mobile repository, and run
 `npm run android` or `npm run ios`. Stop Expo with `Ctrl+C` when finished.
 For project checks, return to the [README](../README.md#quality-checks).
