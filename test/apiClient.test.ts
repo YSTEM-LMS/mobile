@@ -1,5 +1,6 @@
 import { fetch } from 'expo/fetch';
 import { createApiClient } from '@/services/api/apiClient';
+import { AppError } from '@/services/api/apiError';
 
 jest.mock('expo/fetch', () => ({
   fetch: jest.fn(),
@@ -141,8 +142,30 @@ describe('ApiClient', () => {
 
     const requestOptions = mockedFetch.mock.calls[0][1];
     const headers = new Headers(requestOptions?.headers);
-
     expect(headers.get('Authorization')).toBe('Bearer test-login-token');
+  });
+
+  it('sends request without login token', async () => {
+    mockedFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest.fn().mockResolvedValue('{}'),
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    const noTokenClient = createApiClient({
+      baseUrl: 'https://api.example.com',
+      timeoutMs: 10_000,
+      tokenProvider: async () => null,
+    });
+
+    await noTokenClient.get('/items');
+
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+
+    const requestOptions = mockedFetch.mock.calls[0][1];
+    const headers = new Headers(requestOptions?.headers);
+
+    expect(headers.has('Authorization')).toBe(false);
   });
 
   it('throws backend error', async () => {
@@ -273,5 +296,74 @@ describe('ApiClient', () => {
     await requestExpectation;
     expect(tokenProvider).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('throws permission-denied error (403 response)', async () => {
+    mockedFetch.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: jest.fn(),
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    await expect(client.get('/restricted')).rejects.toMatchObject({
+      name: 'AppError',
+      code: 'PERMISSION_DENIED',
+      status: 403,
+      message: 'You do not have permission to perform this action.',
+    });
+  });
+
+  it('does not expose sensitive backend information in errors', async () => {
+    const sensitiveValues = [
+      'password-example',
+      'token-example',
+      'student-record-example',
+    ];
+
+    const sensitiveResponseBody = JSON.stringify({
+      password: sensitiveValues[0],
+      token: sensitiveValues[1],
+      student: sensitiveValues[2],
+    });
+
+    const readResponseBody = jest.fn().mockResolvedValue(sensitiveResponseBody);
+
+    mockedFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: readResponseBody,
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    try {
+      await client.get('/items');
+      throw new Error('Expected the request to fail');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+
+      if (!(error instanceof AppError)) {
+        throw error;
+      }
+
+      expect(error).toMatchObject({
+        code: 'SERVER_ERROR',
+        status: 500,
+        message: 'The server could not complete the request.',
+      });
+
+      const exposedError = [
+        error.name,
+        error.code,
+        error.message,
+        String(error.status),
+      ].join(' ');
+
+      expect(exposedError).not.toContain(sensitiveResponseBody);
+
+      for (const sensitiveValue of sensitiveValues) {
+        expect(exposedError).not.toContain(sensitiveValue);
+      }
+    }
+
+    expect(readResponseBody).not.toHaveBeenCalled();
   });
 });
