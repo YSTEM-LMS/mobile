@@ -36,7 +36,7 @@ const client = createApiClient({
   timeoutMs: 10_000,
 });
 
-describe('ApiClient', () => {
+describe('API Client', () => {
   beforeEach(() => {
     mockedFetch.mockReset();
   });
@@ -168,151 +168,6 @@ describe('ApiClient', () => {
     expect(headers.has('Authorization')).toBe(false);
   });
 
-  it('throws backend error', async () => {
-    mockedFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: jest.fn(),
-    } as unknown as Awaited<ReturnType<typeof fetch>>);
-
-    await expect(client.get('/items')).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'SERVER_ERROR',
-      status: 500,
-      message: 'The server could not complete the request.',
-    });
-  });
-
-  it('throws network error', async () => {
-    mockedFetch.mockRejectedValue(new TypeError('Network request failed'));
-
-    await expect(client.get('/items')).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'NETWORK_ERROR',
-      message: 'Unable to connect to the server.',
-    });
-  });
-
-  it('throws timeout error', async () => {
-    mockPendingFetchUntilAbort();
-
-    const timeoutClient = createApiClient({
-      baseUrl: 'https://api.example.com',
-      timeoutMs: 1,
-    });
-
-    await expect(timeoutClient.get('/items')).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'REQUEST_TIMEOUT',
-      message: 'The request took too long to complete.',
-    });
-  });
-
-  it('throws timeout error while waiting for token provider', async () => {
-    const tokenProvider = jest.fn(() => new Promise<string | null>(() => {}));
-    const authenticatedTimeoutClient = createApiClient({
-      baseUrl: 'https://api.example.com',
-      timeoutMs: 1,
-      tokenProvider,
-    });
-
-    await expect(
-      authenticatedTimeoutClient.get('/protected'),
-    ).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'REQUEST_TIMEOUT',
-      message: 'The request took too long to complete.',
-    });
-
-    expect(tokenProvider).toHaveBeenCalledTimes(1);
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
-
-  it('throws invalid response error', async () => {
-    mockedFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: jest.fn().mockResolvedValue('not valid JSON'),
-    } as unknown as Awaited<ReturnType<typeof fetch>>);
-
-    await expect(client.get('/items')).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'INVALID_RESPONSE',
-      status: 200,
-      message: 'The server returned an invalid response.',
-    });
-  });
-
-  it('throws session-expired error', async () => {
-    mockedFetch.mockResolvedValue({
-      ok: false,
-      status: 401,
-      text: jest.fn(),
-    } as unknown as Awaited<ReturnType<typeof fetch>>);
-
-    await expect(client.get('/protected')).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'SESSION_EXPIRED',
-      status: 401,
-      message: 'Your session has expired.',
-    });
-  });
-
-  it('throws cancel error', async () => {
-    mockPendingFetchUntilAbort();
-
-    const controller = new AbortController();
-    const requestExpectation = expect(
-      client.get('/items', { signal: controller.signal }),
-    ).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'REQUEST_CANCEL',
-      message: 'The request was cancelled.',
-    });
-
-    controller.abort();
-
-    await requestExpectation;
-  });
-
-  it('throws cancel error while waiting for token provider', async () => {
-    const tokenProvider = jest.fn(() => new Promise<string | null>(() => {}));
-    const authenticatedClient = createApiClient({
-      baseUrl: 'https://api.example.com',
-      timeoutMs: 10_000,
-      tokenProvider,
-    });
-
-    const controller = new AbortController();
-    const requestExpectation = expect(
-      authenticatedClient.get('/items', { signal: controller.signal }),
-    ).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'REQUEST_CANCEL',
-      message: 'The request was cancelled.',
-    });
-
-    controller.abort();
-    await requestExpectation;
-    expect(tokenProvider).toHaveBeenCalledTimes(1);
-    expect(mockedFetch).not.toHaveBeenCalled();
-  });
-
-  it('throws permission-denied error (403 response)', async () => {
-    mockedFetch.mockResolvedValue({
-      ok: false,
-      status: 403,
-      text: jest.fn(),
-    } as unknown as Awaited<ReturnType<typeof fetch>>);
-
-    await expect(client.get('/restricted')).rejects.toMatchObject({
-      name: 'AppError',
-      code: 'PERMISSION_DENIED',
-      status: 403,
-      message: 'You do not have permission to perform this action.',
-    });
-  });
-
   it('does not expose sensitive backend information in errors', async () => {
     const sensitiveValues = [
       'password-example',
@@ -365,5 +220,152 @@ describe('ApiClient', () => {
     }
 
     expect(readResponseBody).not.toHaveBeenCalled();
+  });
+
+  describe('Error Handling', () => {
+    it('throws backend error', async () => {
+      mockedFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: jest.fn(),
+      } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+      await expect(client.get('/items')).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'SERVER_ERROR',
+        status: 500,
+        message: 'The server could not complete the request.',
+      });
+    });
+
+    it('throws network error', async () => {
+      mockedFetch.mockRejectedValue(new TypeError('Network request failed'));
+
+      await expect(client.get('/items')).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'NETWORK_ERROR',
+        message: 'Unable to connect to the server.',
+      });
+    });
+
+    it('throws timeout error', async () => {
+      mockPendingFetchUntilAbort();
+
+      const timeoutClient = createApiClient({
+        baseUrl: 'https://api.example.com',
+        timeoutMs: 1,
+      });
+
+      await expect(timeoutClient.get('/items')).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'REQUEST_TIMEOUT',
+        message: 'The request took too long to complete.',
+      });
+    });
+
+    it('throws timeout error while waiting for token provider', async () => {
+      const tokenProvider = jest.fn(() => new Promise<string | null>(() => {}));
+      const authenticatedTimeoutClient = createApiClient({
+        baseUrl: 'https://api.example.com',
+        timeoutMs: 1,
+        tokenProvider,
+      });
+
+      await expect(
+        authenticatedTimeoutClient.get('/protected'),
+      ).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'REQUEST_TIMEOUT',
+        message: 'The request took too long to complete.',
+      });
+
+      expect(tokenProvider).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('throws invalid response error', async () => {
+      mockedFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue('not valid JSON'),
+      } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+      await expect(client.get('/items')).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'INVALID_RESPONSE',
+        status: 200,
+        message: 'The server returned an invalid response.',
+      });
+    });
+
+    it('throws session-expired error', async () => {
+      mockedFetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: jest.fn(),
+      } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+      await expect(client.get('/protected')).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'SESSION_EXPIRED',
+        status: 401,
+        message: 'Your session has expired.',
+      });
+    });
+
+    it('throws cancel error', async () => {
+      mockPendingFetchUntilAbort();
+
+      const controller = new AbortController();
+      const requestExpectation = expect(
+        client.get('/items', { signal: controller.signal }),
+      ).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'REQUEST_CANCEL',
+        message: 'The request was cancelled.',
+      });
+
+      controller.abort();
+
+      await requestExpectation;
+    });
+
+    it('throws cancel error while waiting for token provider', async () => {
+      const tokenProvider = jest.fn(() => new Promise<string | null>(() => {}));
+      const authenticatedClient = createApiClient({
+        baseUrl: 'https://api.example.com',
+        timeoutMs: 10_000,
+        tokenProvider,
+      });
+
+      const controller = new AbortController();
+      const requestExpectation = expect(
+        authenticatedClient.get('/items', { signal: controller.signal }),
+      ).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'REQUEST_CANCEL',
+        message: 'The request was cancelled.',
+      });
+
+      controller.abort();
+      await requestExpectation;
+      expect(tokenProvider).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+
+    it('throws permission-denied error (403 response)', async () => {
+      mockedFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: jest.fn(),
+      } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+      await expect(client.get('/restricted')).rejects.toMatchObject({
+        name: 'AppError',
+        code: 'PERMISSION_DENIED',
+        status: 403,
+        message: 'You do not have permission to perform this action.',
+      });
+    });
   });
 });
