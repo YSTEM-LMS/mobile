@@ -26,17 +26,29 @@ import {
   radii,
   spacing,
 } from '@/design/tokens';
+
 import { useSession } from '@/providers/SessionProvider';
+import { Spinner } from '@/components/ui/Spinner';
+import { InlineError } from '@/components/feedback/InlineError';
+import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
+import { isNonEmptyString } from '@/utils/isNonEmptyString';
+// Temporary AppError import until API is merged
+import { AppError } from '@/services/storage/TokenStore';
 
 const chessPiecePattern = require('@/assets/images/chess-piece-pattern.png');
 
 export default function SignInRoute() {
-  const { mockSignInAs } = useSession();
+  const { mockSignInAs, signIn, session } = useSession();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [error, setError] = useState(
+    session.status === 'expired' ? session.expiredMessage : '',
+  );
+  const [connectionError, setConnectionError] = useState('');
 
   const [btnScale] = useState(() => new Animated.Value(1));
   const pressIn = () =>
@@ -53,6 +65,41 @@ export default function SignInRoute() {
       speed: 50,
       bounciness: 4,
     }).start();
+
+  const signInPressed = async () => {
+    setError('');
+    setConnectionError('');
+    setSigningIn(true);
+
+    if (!isNonEmptyString(username) || !isNonEmptyString(password)) {
+      setSigningIn(false);
+
+      setError('Please enter your username and password');
+
+      return;
+    }
+
+    try {
+      await signIn(username, password);
+    } catch (error) {
+      setSigningIn(false);
+      if (error instanceof AppError) {
+        switch (error.code) {
+          case 'NETWORK_ERROR':
+            setConnectionError(error.message);
+            break;
+          case 'REQUEST_TIMEOUT':
+            setConnectionError(error.message);
+            break;
+          default:
+            setError(error.message);
+            break;
+        }
+      } else {
+        setError('Sign in failed. Please try again.');
+      }
+    }
+  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -94,6 +141,7 @@ export default function SignInRoute() {
               <View style={[s.field, usernameFocused && s.fieldFocused]}>
                 <Text style={s.fieldIcon}>👤</Text>
                 <TextInput
+                  testID="username-input"
                   autoCapitalize="none"
                   autoCorrect={false}
                   onBlur={() => setUsernameFocused(false)}
@@ -110,6 +158,7 @@ export default function SignInRoute() {
               <View style={[s.field, passwordFocused && s.fieldFocused]}>
                 <Text style={s.fieldIcon}>🔒</Text>
                 <TextInput
+                  testID="password-input"
                   autoCapitalize="none"
                   autoCorrect={false}
                   onBlur={() => setPasswordFocused(false)}
@@ -142,12 +191,23 @@ export default function SignInRoute() {
                 accessibilityRole="button"
                 onPressIn={pressIn}
                 onPressOut={pressOut}
+                onPress={signInPressed}
+                disabled={signingIn}
                 style={s.enterBtn}
               >
-                <Text style={s.enterBtnText}>Sign In →</Text>
+                {signingIn ? (
+                  <Spinner label="Signing In" />
+                ) : (
+                  <Text style={s.enterBtnText}>Sign In →</Text>
+                )}
               </Pressable>
             </Animated.View>
 
+            {error && <InlineError message={error} />}
+
+            {connectionError && (
+              <ConnectionBanner message={connectionError} status="offline" />
+            )}
             <View style={s.signupRow}>
               <Text style={s.signupHint}>New here? </Text>
               <Pressable hitSlop={8}>
@@ -157,34 +217,42 @@ export default function SignInRoute() {
           </View>
 
           {/* ── Dev Quick-Login ───────────────────── */}
-          <View style={s.dev}>
-            <View style={s.devDivider}>
-              <View style={s.devLine} />
-              <Text style={s.devLabel}>DEV ONLY</Text>
-              <View style={s.devLine} />
+          {__DEV__ && (
+            <View style={s.dev}>
+              <View style={s.devDivider}>
+                <View style={s.devLine} />
+                <Text style={s.devLabel}>DEV ONLY</Text>
+                <View style={s.devLine} />
+              </View>
+              <View style={s.devRow}>
+                {(['student', 'mentor'] as const).map((role) => (
+                  <Pressable
+                    key={role}
+                    accessibilityLabel={`Continue as ${role}`}
+                    accessibilityRole="button"
+                    onPress={() => {
+                      void mockSignInAs(role).catch(() => {
+                        setError(
+                          'Unable to start a test session. Please try again.',
+                        );
+                      });
+                    }}
+                    style={({ pressed }) => [
+                      s.devBtn,
+                      pressed && s.devBtnPressed,
+                    ]}
+                  >
+                    <Text style={s.devBtnIcon}>
+                      {role === 'student' ? '🎒' : '🎓'}
+                    </Text>
+                    <Text style={s.devBtnText}>
+                      {role === 'student' ? 'Student' : 'Mentor'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-            <View style={s.devRow}>
-              {(['student', 'mentor'] as const).map((role) => (
-                <Pressable
-                  key={role}
-                  accessibilityLabel={`Continue as ${role}`}
-                  accessibilityRole="button"
-                  onPress={() => mockSignInAs(role)}
-                  style={({ pressed }) => [
-                    s.devBtn,
-                    pressed && s.devBtnPressed,
-                  ]}
-                >
-                  <Text style={s.devBtnIcon}>
-                    {role === 'student' ? '🎒' : '🎓'}
-                  </Text>
-                  <Text style={s.devBtnText}>
-                    {role === 'student' ? 'Student' : 'Mentor'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

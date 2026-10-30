@@ -15,6 +15,12 @@ import {
   spacing,
 } from '@/design/tokens';
 import { useSession } from '@/providers/SessionProvider';
+import { useState } from 'react';
+import { InlineError } from '@/components/feedback/InlineError';
+import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
+import { Spinner } from '@/components/ui/Spinner';
+// Temporary AppError import until API is merged
+import { AppError } from '@/services/storage/TokenStore';
 
 type Badge = {
   id: string;
@@ -139,6 +145,36 @@ export default function ProfileRoute() {
     session.status === 'authenticated' ? session.user.role : 'student';
   const initial = displayName.charAt(0).toUpperCase();
   const earnedCount = BADGES.filter((b) => b.earned).length;
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState('');
+  const [connectionError, setConnectionError] = useState('');
+
+  const signOutPressed = async () => {
+    setSigningOut(true);
+    setError('');
+    setConnectionError('');
+
+    try {
+      await signOut();
+    } catch (error) {
+      setSigningOut(false);
+      if (error instanceof AppError) {
+        switch (error.code) {
+          case 'NETWORK_ERROR':
+            setConnectionError(error.message);
+            break;
+          case 'REQUEST_TIMEOUT':
+            setConnectionError(error.message);
+            break;
+          default:
+            setError(error.message);
+            break;
+        }
+      } else {
+        setError('Sign out failed. Please try again.');
+      }
+    }
+  };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -258,14 +294,25 @@ export default function ProfileRoute() {
         <Pressable
           accessibilityLabel="Sign out"
           accessibilityRole="button"
-          onPress={signOut}
+          onPress={signOutPressed}
+          disabled={signingOut}
           style={({ pressed }) => [
             s.signOutBtn,
             pressed && s.signOutBtnPressed,
           ]}
         >
-          <Text style={s.signOutText}>Sign out</Text>
+          {signingOut ? (
+            <Spinner label="Signing out" />
+          ) : (
+            <Text style={s.signOutText}>Sign out</Text>
+          )}
         </Pressable>
+
+        {error && <InlineError message={error} />}
+
+        {connectionError && (
+          <ConnectionBanner message={connectionError} status="offline" />
+        )}
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
