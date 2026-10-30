@@ -3,7 +3,14 @@
  * UI/UX design by Sandith Hewage (Y STEM and Chess)
  */
 
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { theme } from '@/design/theme';
@@ -21,6 +28,10 @@ import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
 import { Spinner } from '@/components/ui/Spinner';
 // Temporary AppError import until API is merged
 import { AppError } from '@/services/storage/TokenStore';
+
+import { ProfileError } from '@/features/profile/api/profile.errors';
+import type { Profile } from '@/features/profile/api/profile.types';
+import { useProfile } from '@/features/profile/hooks/useProfile';
 
 type Badge = {
   id: string;
@@ -138,12 +149,8 @@ const MENU_SECTIONS: { title: string; items: MenuItem[] }[] = [
 ];
 
 export default function ProfileRoute() {
-  const { session, signOut } = useSession();
-  const displayName =
-    session.status === 'authenticated' ? session.user.displayName : 'Student';
-  const role =
-    session.status === 'authenticated' ? session.user.role : 'student';
-  const initial = displayName.charAt(0).toUpperCase();
+  const { signOut } = useSession();
+  const { data: profile, isLoading, error, refetch, isFetching } = useProfile();
   const earnedCount = BADGES.filter((b) => b.earned).length;
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
@@ -183,27 +190,23 @@ export default function ProfileRoute() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Hero ───────────────────────────────── */}
-        <View style={s.hero}>
-          <View style={s.avatarRing}>
-            <View style={s.avatar}>
-              <Text style={s.avatarText}>{initial}</Text>
-            </View>
+        {isLoading ? (
+          <View style={s.statusBox}>
+            <ActivityIndicator accessibilityLabel="Loading profile" />
+            <Text style={s.statusText}>Loading your profile…</Text>
           </View>
-          <Text style={s.displayName}>{displayName}</Text>
-          <View style={s.roleBadge}>
-            <Text style={s.roleIcon}>{role === 'mentor' ? '🎓' : '🎒'}</Text>
-            <Text style={s.roleText}>
-              {role === 'mentor' ? 'Mentor' : 'Student'}
-            </Text>
-          </View>
-          <View style={s.xpRow}>
-            <View style={s.xpPill}>
-              <Text style={s.xpText}>250 XP</Text>
-            </View>
-            <Text style={s.xpSep}>·</Text>
-            <Text style={s.xpLevel}>Level 3</Text>
-          </View>
-        </View>
+        ) : profile ? (
+          <>
+            <ProfileHero profile={profile} />
+            <ProfileDetails profile={profile} />
+          </>
+        ) : (
+          <ProfileLoadError
+            error={error}
+            retrying={isFetching}
+            onRetry={() => refetch()}
+          />
+        )}
 
         {/* ── Stats ──────────────────────────────── */}
         <View style={s.statsCard}>
@@ -317,6 +320,103 @@ export default function ProfileRoute() {
         <View style={{ height: spacing.xl }} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function ProfileHero({ profile }: { profile: Profile }) {
+  const name = profile.fullName ?? profile.username;
+  const initial = name.charAt(0).toUpperCase();
+  const isMentor = profile.role === 'mentor';
+
+  return (
+    <View style={s.hero}>
+      <View style={s.avatarRing}>
+        <View style={s.avatar}>
+          <Text style={s.avatarText}>{initial}</Text>
+        </View>
+      </View>
+      <Text style={s.displayName}>{name}</Text>
+      <View style={s.roleBadge}>
+        <Text style={s.roleIcon}>{isMentor ? '🎓' : '🎒'}</Text>
+        <Text style={s.roleText}>{isMentor ? 'Mentor' : 'Student'}</Text>
+      </View>
+      <View style={s.xpRow}>
+        <View style={s.xpPill}>
+          <Text style={s.xpText}>250 XP</Text>
+        </View>
+        <Text style={s.xpSep}>·</Text>
+        <Text style={s.xpLevel}>Level 3</Text>
+      </View>
+    </View>
+  );
+}
+
+function ProfileDetails({ profile }: { profile: Profile }) {
+  const rows = [
+    { label: 'Username', value: profile.username },
+    { label: 'Role', value: profile.role === 'mentor' ? 'Mentor' : 'Student' },
+    { label: 'School', value: profile.school },
+    { label: 'Grade level', value: profile.gradeLevel },
+    { label: 'Location', value: profile.location, hideWhenEmpty: true },
+  ].filter((r) => r.value || !r.hideWhenEmpty);
+
+  return (
+    <View style={s.section}>
+      <Text style={s.menuSectionTitle}>Profile</Text>
+      <View style={s.menuCard}>
+        {rows.map((row, i) => (
+          <View
+            key={row.label}
+            style={[s.detailRow, i < rows.length - 1 && s.menuRowBorder]}
+          >
+            <Text style={s.detailLabel}>{row.label}</Text>
+            <Text style={row.value ? s.detailValue : s.detailValueMissing}>
+              {row.value ?? 'Not provided'}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ProfileLoadError({
+  error,
+  retrying,
+  onRetry,
+}: {
+  error: unknown;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  const kind = error instanceof ProfileError ? error.kind : 'network';
+  const message =
+    kind === 'session-expired'
+      ? 'Your session has expired. Please sign in again.'
+      : kind === 'invalid-data'
+        ? "We couldn't read your profile information."
+        : "We couldn't load your profile. Please try again.";
+
+  return (
+    <View style={s.statusBox} accessibilityRole="alert">
+      <Text style={s.statusText}>{message}</Text>
+      {kind !== 'session-expired' && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          disabled={retrying}
+          onPress={onRetry}
+          style={({ pressed }) => [
+            s.retryBtn,
+            (pressed || retrying) && s.retryBtnPressed,
+          ]}
+        >
+          <Text style={s.retryText}>
+            {retrying ? 'Retrying…' : 'Try again'}
+          </Text>
+        </Pressable>
+      )}
+    </View>
   );
 }
 
@@ -526,5 +626,53 @@ const s = StyleSheet.create({
     fontSize: fontSizes.label,
     fontWeight: fontWeights.semibold,
     color: palette.error,
+  },
+
+  /* Profile status + details */
+  statusBox: {
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.xl,
+  },
+  statusText: {
+    fontSize: fontSizes.label,
+    color: palette.muted,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: palette.brandGreen,
+    borderRadius: radii.lg,
+    minHeight: 48,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryBtnPressed: { opacity: 0.7 },
+  retryText: {
+    fontSize: fontSizes.label,
+    fontWeight: fontWeights.semibold,
+    color: palette.white,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  detailLabel: { fontSize: fontSizes.label, color: palette.muted },
+  detailValue: {
+    flexShrink: 1,
+    fontSize: fontSizes.label,
+    fontWeight: fontWeights.semibold,
+    color: palette.ink,
+    textAlign: 'right',
+  },
+  detailValueMissing: {
+    flexShrink: 1,
+    fontSize: fontSizes.label,
+    color: palette.muted,
+    textAlign: 'right',
   },
 });
