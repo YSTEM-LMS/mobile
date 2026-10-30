@@ -1,10 +1,12 @@
 import { z } from 'zod';
 
+const serviceUrl = z.string().trim().min(1).url();
+
 const publicEnvironmentSchema = z.object({
   appEnv: z.enum(['development', 'preview', 'production']),
-  apiBaseUrl: z.string().trim().min(1).url(),
-  chessSocketUrl: z.string().trim().min(1).url(),
-  stockfishSocketUrl: z.string().trim().min(1).url(),
+  apiBaseUrl: serviceUrl,
+  chessSocketUrl: serviceUrl,
+  stockfishSocketUrl: serviceUrl,
 });
 
 export class EnvironmentConfigError extends Error {
