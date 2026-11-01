@@ -7,6 +7,7 @@ import {
   RequestOptions,
 } from '../../types/apiClient.types';
 import { AppError } from './apiError';
+import { tokenStore } from '../storage/TokenStore';
 
 // 10 second timeout
 export const REQUEST_TIMEOUT_MS = 10_000;
@@ -94,7 +95,7 @@ class ApiClient implements ApiClientInterface {
       });
 
       headers.set('Accept', 'application/json');
-      if (token) {
+      if (token && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${token}`);
       }
 
@@ -207,4 +208,5 @@ export function createApiClient(options: ApiClientOptions): ApiClientInterface {
 export const apiClient = createApiClient({
   baseUrl: env.apiBaseUrl,
   timeoutMs: REQUEST_TIMEOUT_MS,
+  tokenProvider: tokenStore.getToken,
 });
