@@ -15,8 +15,8 @@ import {
   type UserRole,
 } from '@/state/session';
 
-// Temporary AppError import until API is merged
-import { AppError, tokenStore } from '@/services/storage/TokenStore';
+import { tokenStore } from '@/services/storage/TokenStore';
+import { AppError } from '@/services/api/apiError';
 
 import { useQueryClient } from '@tanstack/react-query';
 import {
