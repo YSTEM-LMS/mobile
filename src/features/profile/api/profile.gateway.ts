@@ -1,5 +1,8 @@
 import { Profile } from './profile.types';
 
 export interface ProfileGateway {
-  getProfile(): Promise<Profile>;
+  getProfile(
+    username: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<Profile>;
 }
