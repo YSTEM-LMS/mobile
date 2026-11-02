@@ -17,10 +17,9 @@ export function createApiProfileGateway(
         );
       } catch (error) {
         if (error instanceof AppError) {
-          if (error.code === 'REQUEST_CANCEL') throw error;
-          if (error.code === 'SESSION_EXPIRED') 
-            throw new ProfileError('session-expired', error.message);
-          if (error.code === 'INVALID_RESPONSE') 
+          if (error.code === 'REQUEST_CANCEL' || error.code === 'SESSION_EXPIRED')
+            throw error;
+          if (error.code === 'INVALID_RESPONSE')
             throw new ProfileError('invalid-data', error.message);
         }
         throw new ProfileError('network', 'Could not load your profile.');
