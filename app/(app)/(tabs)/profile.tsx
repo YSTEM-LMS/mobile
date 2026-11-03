@@ -150,15 +150,21 @@ const MENU_SECTIONS: { title: string; items: MenuItem[] }[] = [
 
 export default function ProfileRoute() {
   const { signOut } = useSession();
-  const { data: profile, isLoading, error, refetch, isFetching } = useProfile();
+  const {
+    data: profile,
+    isLoading,
+    error: profileError,
+    refetch,
+    isFetching,
+  } = useProfile();
   const earnedCount = BADGES.filter((b) => b.earned).length;
   const [signingOut, setSigningOut] = useState(false);
-  const [error, setError] = useState('');
+  const [signOutError, setSignOutError] = useState('');
   const [connectionError, setConnectionError] = useState('');
 
   const signOutPressed = async () => {
     setSigningOut(true);
-    setError('');
+    setSignOutError('');
     setConnectionError('');
 
     try {
@@ -174,11 +180,11 @@ export default function ProfileRoute() {
             setConnectionError(error.message);
             break;
           default:
-            setError(error.message);
+            setSignOutError(error.message);
             break;
         }
       } else {
-        setError('Sign out failed. Please try again.');
+        setSignOutError('Sign out failed. Please try again.');
       }
     }
   };
@@ -202,7 +208,7 @@ export default function ProfileRoute() {
           </>
         ) : (
           <ProfileLoadError
-            error={error}
+            error={profileError}
             retrying={isFetching}
             onRetry={() => refetch()}
           />
@@ -311,7 +317,7 @@ export default function ProfileRoute() {
           )}
         </Pressable>
 
-        {error && <InlineError message={error} />}
+        {signOutError && <InlineError message={signOutError} />}
 
         {connectionError && (
           <ConnectionBanner message={connectionError} status="offline" />
