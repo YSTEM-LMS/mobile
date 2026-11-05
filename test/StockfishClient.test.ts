@@ -1,3 +1,5 @@
+import { DEFAULT_POSITION } from 'chess.js';
+
 import { env } from '@/config/env';
 import {
   createStockfishClient,
@@ -5,24 +7,27 @@ import {
   type StockfishClient,
   type StockfishLevel,
 } from '@/features/play/services/StockfishClient';
+import {
+  engineReplyFixtures,
+  evaluationCompletePayload,
+  stockfishWorkedExample,
+} from '@/features/play/services/stockfishFixtures';
 
 import { FakeSocket } from './mocks/FakeSocket';
 
 const TIMEOUT_MS = 1_000;
 
-const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+// The position after 1. e4 (Black, the engine, to move), and the server's
+// reply to it. See stockfishWorkedExample.
+const MOVE_REQUEST = stockfishWorkedExample.request;
+const ENGINE_REPLY = stockfishWorkedExample.serverReply;
 
-// What the real server sends for { fen: START_FEN, move: 'e2e4' }: the engine's
-// move is correct, but moveDetails is null and newFEN is unchanged, because the
-// server applies e7e5 to the position before e2e4. The client returns only `move`.
-const ENGINE_REPLY = {
-  mode: 'move',
-  move: 'e7e5',
-  moveDetails: null,
-  newFEN: START_FEN,
-};
-
-const MOVE_REQUEST = { fen: START_FEN, move: 'e2e4', level: 3 } as const;
+// The position after 1. e4 e5 2. Nf3, and a legal reply to it.
+const NEXT_REQUEST = { fen: engineReplyFixtures[1].fen, level: 3 } as const;
+const NEXT_REPLY = evaluationCompletePayload(
+  engineReplyFixtures[1].fen,
+  engineReplyFixtures[1].move,
+);
 
 // While a session is in use, the client keeps one session-error listener.
 const SESSION_WATCHER = 1;
@@ -163,7 +168,7 @@ describe('createStockfishClient: startSession', () => {
     await startSession(client, socket);
 
     expect(socket.payloadsFor('start-session')).toEqual([
-      { sessionType: 'player-vs-computer', fen: 'start' },
+      { sessionType: 'player-vs-computer', fen: DEFAULT_POSITION },
     ]);
   });
 
@@ -218,28 +223,66 @@ describe('createStockfishClient: requestMove', () => {
   it('requires a started session', async () => {
     const { client, socket } = setup();
 
-    await expect(
-      client.requestMove({ fen: START_FEN, move: 'e2e4', level: 3 }),
-    ).rejects.toThrow('Call startSession()');
+    await expect(client.requestMove(MOVE_REQUEST)).rejects.toThrow(
+      'Call startSession()',
+    );
     expect(socket.payloadsFor('evaluate-fen')).toHaveLength(0);
   });
 
-  it('sends the FEN and the player move', async () => {
+  it('sends the position after the player move, with an empty move', async () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const result = client.requestMove({
-      fen: START_FEN,
-      move: 'e2e4',
-      level: 3,
-    });
+    const result = client.requestMove(MOVE_REQUEST);
 
     expect(socket.payloadsFor('evaluate-fen')).toEqual([
-      { fen: START_FEN, move: 'e2e4', level: 3 },
+      stockfishWorkedExample.emitted,
+    ]);
+    socket.serverEmit('evaluation-complete', ENGINE_REPLY);
+    await expect(result).resolves.toEqual(stockfishWorkedExample.engineMove);
+  });
+
+  it('never sends a player move, so it cannot be applied twice', async () => {
+    const { client, socket } = setup();
+    await startSession(client, socket);
+
+    // A caller that still passes the old `move` field (bypassing TypeScript).
+    const result = client.requestMove({
+      ...MOVE_REQUEST,
+      move: 'e2e4',
+    } as typeof MOVE_REQUEST);
+
+    expect(socket.payloadsFor('evaluate-fen')).toEqual([
+      { fen: MOVE_REQUEST.fen, move: '', level: 3 },
     ]);
     socket.serverEmit('evaluation-complete', ENGINE_REPLY);
     await result;
   });
+
+  it.each([
+    'start',
+    '',
+    'not a fen',
+    // No black king.
+    'rnbq1bnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
+  ])(
+    'rejects the invalid position %p without sending anything',
+    async (fen) => {
+      const { client, socket } = setup();
+      await startSession(client, socket);
+
+      await expect(client.requestMove({ fen, level: 3 })).rejects.toThrow(
+        'Invalid position',
+      );
+      expect(socket.payloadsFor('evaluate-fen')).toHaveLength(0);
+
+      // The session is untouched and still usable.
+      const result = client.requestMove(MOVE_REQUEST);
+      socket.serverEmit('evaluation-complete', ENGINE_REPLY);
+      await expect(result).resolves.toEqual({ move: 'e7e5' });
+      expect(socket.disconnectCalls).toBe(0);
+    },
+  );
 
   it.each([1, 2, 3, 4, 5] as const)(
     'sends difficulty level %i',
@@ -247,11 +290,7 @@ describe('createStockfishClient: requestMove', () => {
       const { client, socket } = setup();
       await startSession(client, socket);
 
-      const result = client.requestMove({
-        fen: START_FEN,
-        move: 'e2e4',
-        level,
-      });
+      const result = client.requestMove({ ...MOVE_REQUEST, level });
 
       expect(socket.payloadsFor('evaluate-fen')).toEqual([
         expect.objectContaining({ level }),
@@ -268,8 +307,7 @@ describe('createStockfishClient: requestMove', () => {
       await startSession(client, socket);
 
       const result = client.requestMove({
-        fen: START_FEN,
-        move: 'e2e4',
+        ...MOVE_REQUEST,
         level: level as StockfishLevel,
       });
 
@@ -283,11 +321,7 @@ describe('createStockfishClient: requestMove', () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const result = client.requestMove({
-      fen: START_FEN,
-      move: 'e2e4',
-      level: 3,
-    });
+    const result = client.requestMove(MOVE_REQUEST);
     socket.serverEmit('evaluation-complete', ENGINE_REPLY);
 
     await expect(result).resolves.toEqual({ move: 'e7e5' });
@@ -298,32 +332,39 @@ describe('createStockfishClient: requestMove', () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const result = client.requestMove({
-      fen: START_FEN,
-      move: 'e2e4',
-      level: 3,
-    });
+    const result = client.requestMove(MOVE_REQUEST);
     socket.serverEmit('evaluation-complete', { mode: 'move' });
 
     await expect(result).rejects.toThrow('Invalid evaluation-complete payload');
-    expect(socket.listenerCount()).toBe(SESSION_WATCHER);
+    expect(socket.listenerCount()).toBe(0);
+    expect(socket.disconnectCalls).toBe(1);
   });
 
-  it('rejects when the server reports an evaluation error', async () => {
+  it('rejects and resets when the server reports an evaluation error', async () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const result = client.requestMove({
-      fen: START_FEN,
-      move: 'e2e4',
-      level: 3,
-    });
-    socket.serverEmit('evaluation-error', {
-      error: 'Invalid move from engine',
-    });
+    const result = client.requestMove(MOVE_REQUEST);
+    socket.serverEmit('evaluation-error', { error: 'Session not found!' });
 
-    await expect(result).rejects.toThrow('Invalid move from engine');
-    expect(socket.listenerCount()).toBe(SESSION_WATCHER);
+    await expect(result).rejects.toThrow('Session not found!');
+    expect(socket.listenerCount()).toBe(0);
+    expect(socket.disconnectCalls).toBe(1);
+    await expect(client.requestMove(MOVE_REQUEST)).rejects.toThrow(
+      'Call startSession()',
+    );
+  });
+
+  it('rejects and resets when the connection drops mid-request', async () => {
+    const { client, socket } = setup();
+    await startSession(client, socket);
+
+    const result = client.requestMove(MOVE_REQUEST);
+    socket.connected = false;
+    socket.serverEmit('disconnect', 'transport close');
+
+    await expect(result).rejects.toThrow('transport close');
+    expect(socket.listenerCount()).toBe(0);
   });
 
   it('rejects on timeout and removes its listeners', async () => {
@@ -331,11 +372,7 @@ describe('createStockfishClient: requestMove', () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const result = client.requestMove({
-      fen: START_FEN,
-      move: 'e2e4',
-      level: 3,
-    });
+    const result = client.requestMove(MOVE_REQUEST);
     const assertion = expect(result).rejects.toThrow('Timed out');
     jest.advanceTimersByTime(TIMEOUT_MS);
     await assertion;
@@ -347,16 +384,8 @@ describe('createStockfishClient: requestMove', () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const first = client.requestMove({
-      fen: START_FEN,
-      move: 'e2e4',
-      level: 3,
-    });
-    const second = client.requestMove({
-      fen: START_FEN,
-      move: 'd2d4',
-      level: 3,
-    });
+    const first = client.requestMove(MOVE_REQUEST);
+    const second = client.requestMove(NEXT_REQUEST);
 
     await expect(second).rejects.toThrow('already in progress');
     expect(socket.payloadsFor('evaluate-fen')).toHaveLength(1);
@@ -369,14 +398,14 @@ describe('createStockfishClient: requestMove', () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    for (let i = 0; i < 3; i += 1) {
-      const result = client.requestMove({
-        fen: START_FEN,
-        move: 'e2e4',
-        level: 3,
-      });
+    for (const [request, reply] of [
+      [MOVE_REQUEST, ENGINE_REPLY],
+      [NEXT_REQUEST, NEXT_REPLY],
+      [MOVE_REQUEST, ENGINE_REPLY],
+    ] as const) {
+      const result = client.requestMove(request);
       expect(socket.listenerCount('evaluation-complete')).toBe(1);
-      socket.serverEmit('evaluation-complete', ENGINE_REPLY);
+      socket.serverEmit('evaluation-complete', reply);
       await result;
     }
 
@@ -385,14 +414,17 @@ describe('createStockfishClient: requestMove', () => {
 });
 
 describe('createStockfishClient: move validation', () => {
-  it.each(['e7e5', 'g8f6', 'e1g1', 'e7e8q', 'a7b8r', 'c2c1b', 'h2h1n'])(
-    'accepts the UCI move %p',
-    async (move) => {
+  it.each(engineReplyFixtures)(
+    'resolves a legal reply: $name',
+    async ({ fen, move }) => {
       const { client, socket } = setup();
       await startSession(client, socket);
 
-      const result = client.requestMove(MOVE_REQUEST);
-      socket.serverEmit('evaluation-complete', { ...ENGINE_REPLY, move });
+      const result = client.requestMove({ fen, level: 3 });
+      socket.serverEmit(
+        'evaluation-complete',
+        evaluationCompletePayload(fen, move),
+      );
 
       await expect(result).resolves.toEqual({ move });
     },
@@ -422,17 +454,21 @@ describe('createStockfishClient: move validation', () => {
     await expect(result).rejects.toThrow('Invalid evaluation-complete payload');
   });
 
-  it('returns null instead of "(none)" when the engine has no legal move', async () => {
+  it.each([
+    ['a move for the wrong side', MOVE_REQUEST.fen, 'd2d4'],
+    ['a move from an empty square', MOVE_REQUEST.fen, 'e5e4'],
+    ['"(none)" when legal moves exist', MOVE_REQUEST.fen, '(none)'],
+    ['a promotion without a piece', '7k/8/8/8/8/8/p6K/8 b - - 0 1', 'a2a1'],
+    ['a promotion by a rook', '7k/8/8/8/8/8/r6K/8 b - - 0 1', 'a2a1q'],
+  ])('rejects and resets on %s', async (_, fen, move) => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const result = client.requestMove(MOVE_REQUEST);
-    socket.serverEmit('evaluation-complete', {
-      ...ENGINE_REPLY,
-      move: '(none)',
-    });
+    const result = client.requestMove({ fen, level: 3 });
+    socket.serverEmit('evaluation-complete', { ...ENGINE_REPLY, move });
 
-    await expect(result).resolves.toEqual({ move: null });
+    await expect(result).rejects.toThrow('not legal in the requested position');
+    expect(socket.disconnectCalls).toBe(1);
   });
 });
 
@@ -466,13 +502,65 @@ describe('createStockfishClient: recovery', () => {
     await assertion;
 
     const second = await startFreshSession(client, sockets);
-    const result = client.requestMove({ ...MOVE_REQUEST, move: 'd2d4' });
+    const result = client.requestMove(NEXT_REQUEST);
 
-    // The engine's late answer to e2e4 must not resolve the d2d4 request.
+    // The engine's late answer to the first position must not resolve the
+    // newer request.
     first.serverEmit('evaluation-complete', ENGINE_REPLY);
-    second.serverEmit('evaluation-complete', { ...ENGINE_REPLY, move: 'd7d5' });
+    second.serverEmit('evaluation-complete', NEXT_REPLY);
 
-    await expect(result).resolves.toEqual({ move: 'd7d5' });
+    await expect(result).resolves.toEqual({ move: 'b8c6' });
+  });
+
+  it('does not let a stray reply complete a later request', async () => {
+    const { client, socket } = setup();
+    await startSession(client, socket);
+
+    const first = client.requestMove(MOVE_REQUEST);
+    socket.serverEmit('evaluation-complete', ENGINE_REPLY);
+    await expect(first).resolves.toEqual({ move: 'e7e5' });
+
+    // A duplicate of the first reply arrives while the next request waits.
+    // e7e5 is not legal after 1. e4 e5 2. Nf3, so it is rejected, and the
+    // session is reset so the real reply cannot be mismatched either.
+    const second = client.requestMove(NEXT_REQUEST);
+    socket.serverEmit('evaluation-complete', ENGINE_REPLY);
+
+    await expect(second).rejects.toThrow('not legal in the requested position');
+    expect(socket.disconnectCalls).toBe(1);
+    expect(socket.listenerCount()).toBe(0);
+  });
+
+  it('ignores a reply that arrives after the request completed', async () => {
+    const { client, socket } = setup();
+    await startSession(client, socket);
+
+    const result = client.requestMove(MOVE_REQUEST);
+    socket.serverEmit('evaluation-complete', ENGINE_REPLY);
+    await result;
+
+    expect(() =>
+      socket.serverEmit('evaluation-complete', ENGINE_REPLY),
+    ).not.toThrow();
+    expect(socket.listenerCount('evaluation-complete')).toBe(0);
+    expect(socket.disconnectCalls).toBe(0);
+  });
+
+  it('recovers after a failed request by starting a new session', async () => {
+    const { client, sockets } = setupWithFreshSockets();
+    const first = await startFreshSession(client, sockets);
+
+    const failed = client.requestMove(MOVE_REQUEST);
+    first.serverEmit('evaluation-error', { error: 'Session not found!' });
+    await expect(failed).rejects.toThrow('Session not found!');
+
+    // The documented recovery: startSession(), then repeat the request.
+    const second = await startFreshSession(client, sockets);
+    const retried = client.requestMove(MOVE_REQUEST);
+    second.serverEmit('evaluation-complete', ENGINE_REPLY);
+
+    await expect(retried).resolves.toEqual({ move: 'e7e5' });
+    expect(sockets).toHaveLength(2);
   });
 
   it('invalidates the session on a session-error after session-started', async () => {
@@ -572,11 +660,7 @@ describe('createStockfishClient: disconnect', () => {
     const { client, socket } = setup();
     await startSession(client, socket);
 
-    const result = client.requestMove({
-      fen: START_FEN,
-      move: 'e2e4',
-      level: 3,
-    });
+    const result = client.requestMove(MOVE_REQUEST);
     client.disconnect();
 
     await expect(result).rejects.toThrow('disconnected');
@@ -625,9 +709,9 @@ describe('createStockfishClient: disconnect', () => {
     socket.connected = false;
     socket.serverEmit('disconnect', 'transport close');
 
-    await expect(
-      client.requestMove({ fen: START_FEN, move: 'e2e4', level: 3 }),
-    ).rejects.toThrow('Call startSession() again');
+    await expect(client.requestMove(MOVE_REQUEST)).rejects.toThrow(
+      'Call startSession() again',
+    );
 
     await startSession(client, socket);
 
