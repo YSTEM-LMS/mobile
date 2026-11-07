@@ -3,9 +3,20 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import ProfileRoute from '../app/(app)/(tabs)/profile';
 import { createFakeProfileGateway } from '../src/features/profile/api/fakeProfileGateway';
 import type { ProfileGateway } from '../src/features/profile/api/profile.gateway';
+import type { SessionState } from '../src/state/session';
+import { createQueryClient } from '@/providers/QueryProvider';
 
 let mockGateway: ProfileGateway;
 const mockSignOut = jest.fn();
+const mockSession: SessionState = {
+  status: 'authenticated',
+  user: {
+    username: 'sample.student',
+    displayName: 'Sample Student',
+    role: 'student',
+  },
+};
+const mockExpiredSession = jest.fn();
 
 jest.mock('@/features/profile/api/gatewayProvider', () => ({
   get profileGateway() {
@@ -15,8 +26,9 @@ jest.mock('@/features/profile/api/gatewayProvider', () => ({
 
 jest.mock('@/providers/SessionProvider', () => ({
   useSession: () => ({
-    session: { status: 'authenticated' },
+    session: mockSession,
     signOut: mockSignOut,
+    expiredSession: mockExpiredSession,
   }),
 }));
 
@@ -27,7 +39,7 @@ function renderScreen(
 ) {
   mockGateway = createFakeProfileGateway({ delayMs: 0, ...options });
   queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -38,7 +50,15 @@ function renderScreen(
 
 const LOAD_ERROR = "We couldn't load your profile. Please try again.";
 
-beforeEach(() => mockSignOut.mockClear());
+beforeEach(() => {
+  queryClient = createQueryClient();
+  queryClient.setDefaultOptions({
+    ...queryClient.getDefaultOptions(),
+    queries: { ...queryClient.getDefaultOptions().queries, gcTime: Infinity },
+  });
+  mockSignOut.mockClear();
+  mockExpiredSession.mockClear();
+});
 
 afterEach(() => {
   queryClient?.clear();
@@ -107,6 +127,7 @@ describe('Profile screen', () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByLabelText('Try again')).toBeNull();
+    expect(mockExpiredSession).toHaveBeenCalledTimes(1);
   });
 
   test('Sign out works when the profile loaded', async () => {

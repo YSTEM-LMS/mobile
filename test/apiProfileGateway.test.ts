@@ -14,12 +14,35 @@ const makeClient = (get: jest.Mock) =>
 const valid = {
   username: 'alice',
   role: 'Student',
-  first_name: ' Alice ',
-  last_name: 'Lee',
+  firstName: ' Alice ',
+  lastName: 'Lee',
   school: 'Test High',
-  grade_level: '10',
+  gradeLevel: '10',
   state: 'CA',
   country: 'USA',
+};
+
+const backendResponse = {
+  _id: 'abc123',
+  username: 'sample.student',
+  accountCreatedAt: '1/1/2026, 12:00:00 PM',
+  avatarKey: null,
+  birthday: null,
+  country: null,
+  email: 'sample@example.invalid',
+  firstName: 'Sample',
+  gender: null,
+  gradeLevel: null,
+  highestStreak: 0,
+  lastName: 'Student',
+  lessonsCompleted: [{ _id: 'l1', piece: 'Lesson', lessonNumber: 0 }],
+  mentorshipUsername: 'sample.mentor',
+  occupation: null,
+  role: 'student',
+  school: null,
+  state: null,
+  timePlayed: 0,
+  zipcode: null,
 };
 
 describe('ApiProfileGateway', () => {
@@ -48,7 +71,26 @@ describe('ApiProfileGateway', () => {
       fullName: 'Alice Lee',
       gradeLevel: '10',
       location: 'CA, USA',
-      email: null, // missing stays null, no inventing
+      email: null,
+    });
+  });
+
+  it('accepts and maps the backend response shape', async () => {
+    const get = jest.fn().mockResolvedValue(backendResponse);
+    const profile = await createApiProfileGateway(makeClient(get)).getProfile(
+      'sample.student',
+    );
+
+    expect(profile).toMatchObject({
+      username: 'sample.student',
+      role: 'student',
+      firstName: 'Sample',
+      lastName: 'Student',
+      fullName: 'Sample Student',
+      email: 'sample@example.invalid',
+      zipCode: null,
+      gradeLevel: null,
+      location: null,
     });
   });
 
@@ -101,18 +143,19 @@ describe('ApiProfileGateway', () => {
     await expect(promise).rejects.toMatchObject({ kind: 'network' });
   });
 
-  it.each(['SESSION_EXPIRED', 'REQUEST_CANCEL'] as const)(
-    'rethrows %s unchanged',
-    async (code) => {
-      const err = new AppError(
-        code,
-        'x',
-        code === 'SESSION_EXPIRED' ? 401 : undefined,
-      );
-      const get = jest.fn().mockRejectedValue(err);
-      await expect(
-        createApiProfileGateway(makeClient(get)).getProfile('alice'),
-      ).rejects.toBe(err);
-    },
-  );
+  it('maps SESSION_EXPIRED to session-expired', async () => {
+    const err = new AppError('SESSION_EXPIRED', 'x', 401);
+    const get = jest.fn().mockRejectedValue(err);
+    await expect(
+      createApiProfileGateway(makeClient(get)).getProfile('alice'),
+    ).rejects.toMatchObject({ kind: 'session-expired' });
+  });
+
+  it('rethrows REQUEST_CANCEL unchanged', async () => {
+    const err = new AppError('REQUEST_CANCEL', 'x');
+    const get = jest.fn().mockRejectedValue(err);
+    await expect(
+      createApiProfileGateway(makeClient(get)).getProfile('alice'),
+    ).rejects.toBe(err);
+  });
 });

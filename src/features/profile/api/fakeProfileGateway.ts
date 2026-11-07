@@ -14,12 +14,12 @@ const samples = {
   student: {
     username: 'sample.student',
     role: 'student',
-    first_name: 'Sample',
-    last_name: 'Student',
+    firstName: 'Sample',
+    lastName: 'Student',
     email: 'sample.student@example.invalid',
-    zip_code: '00000',
+    zipcode: '00000',
     gender: 'Prefer not to say',
-    grade_level: '10',
+    gradeLevel: '10',
     country: 'Sampleland',
     state: 'Sample State',
     school: 'Sample High School',
@@ -27,8 +27,8 @@ const samples = {
   mentor: {
     username: 'sample.mentor',
     role: 'mentor',
-    first_name: 'Sample',
-    last_name: 'Mentor',
+    firstName: 'Sample',
+    lastName: 'Mentor',
     email: 'sample.mentor@example.invalid',
     country: 'Sampleland',
     state: 'Sample State',
@@ -50,7 +50,7 @@ export function createFakeProfileGateway(
   const wait = () => new Promise((r) => setTimeout(r, delayMs));
 
   return {
-    async getProfile() {
+    async getProfile(username?: string) {
       await wait();
       if (failuresLeft > 0) {
         failuresLeft -= 1;
@@ -60,7 +60,15 @@ export function createFakeProfileGateway(
         throw new ProfileError('network', 'Fake network failure');
       if (scenario === 'session-expired')
         throw new ProfileError('session-expired', 'Fake expired session');
-      return parseProfile(samples[scenario]);
+
+      const sample = samples[scenario];
+      // Return the username that was requested, so tests can tell users apart
+      // The invalid-data sample has a non-string username and must stay invalid
+      return parseProfile(
+        username && typeof sample.username === 'string'
+          ? { ...sample, username }
+          : sample,
+      );
     },
   };
 }
