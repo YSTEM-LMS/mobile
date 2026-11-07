@@ -91,7 +91,10 @@ npm run lint
 npm run format:check
 ```
 
-The older fixtures in `fixtures.ts` contain placeholder FEN and move values. Replace them with valid chess positions and UCI moves before using fixtures to render a chessboard; they are currently suitable only for data-layer tests.
+The fixtures in `src/features/puzzles/fixtures.ts` use valid, synthetic
+chess positions and legal UCI move sequences. They provide full,
+partial, minimal, and null-optional backend examples for testing
+validation, mapping, and API behavior.
 
 ## Unanswered questions
 
