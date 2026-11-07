@@ -14,8 +14,8 @@ describe('mapPuzzle', () => {
   it('maps a full backend puzzle to the app-facing Puzzle', () => {
     expect(mapPuzzle(fullPuzzleFixture)).toEqual({
       id: 'test-001',
-      fen: 'sample-position-1',
-      moves: ['move1', 'move2', 'move3'],
+      fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2',
+      moves: ['g1f3', 'b8c6', 'f1c4'],
       rating: 1000,
       ratingDeviation: 50,
       popularity: 90,
