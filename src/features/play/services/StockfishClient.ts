@@ -1,8 +1,10 @@
+import { Chess, DEFAULT_POSITION } from 'chess.js';
 import { io } from 'socket.io-client';
 import { z } from 'zod';
 
 import { env } from '@/config/env';
 
+/** Engine search depth: level 3 means `go depth 3` on the server. */
 export type StockfishLevel = 1 | 2 | 3 | 4 | 5;
 
 /**
@@ -10,22 +12,26 @@ export type StockfishLevel = 1 | 2 | 3 | 4 | 5;
  * or `null` when the engine has no legal move (checkmate or stalemate; the
  * server sends "(none)").
  *
- * The server's `newFEN` field is deliberately not exposed: when a player move
- * is sent, the server applies the engine's reply to the position *before* the
- * player's move, so `newFEN` is wrong. Callers apply `move` to their own board
- * instead, as the website does. See docs/stockfish-socket-contract.md.
+ * The server's `newFEN` field is deliberately not exposed. Callers apply `move`
+ * to their own board, as the website does. See docs/stockfish-socket-contract.md.
  */
 export interface EngineMove {
   move: string | null;
 }
 
+export interface MoveRequest {
+  /**
+   * The position AFTER the player's move, with the engine to move. The board
+   * has already applied the player's move (including any promotion), so the
+   * client never sends the move separately and it cannot be applied twice.
+   */
+  fen: string;
+  level: StockfishLevel;
+}
+
 export interface StockfishClient {
   startSession(): Promise<void>; // connects lazily, then starts the session
-  requestMove(input: {
-    fen: string;
-    move: string;
-    level: StockfishLevel;
-  }): Promise<EngineMove>;
+  requestMove(request: MoveRequest): Promise<EngineMove>;
   disconnect(): void;
 }
 
@@ -65,6 +71,54 @@ export function isStockfishLevel(value: unknown): value is StockfishLevel {
   );
 }
 
+/**
+ * Checks a move request before anything is sent and returns its position.
+ * The server does not validate FENs: an invalid one can leave the engine
+ * without a reply, so it is rejected here instead.
+ */
+export function validateMoveRequest({ fen, level }: MoveRequest): Chess {
+  // TypeScript can be bypassed (e.g. `as StockfishLevel`), so check at runtime.
+  if (!isStockfishLevel(level)) {
+    throw new StockfishClientError(
+      `Difficulty level must be an integer from 1 to 5 (received ${String(level)})`,
+    );
+  }
+
+  try {
+    return new Chess(fen);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new StockfishClientError(`Invalid position: ${detail}`);
+  }
+}
+
+/**
+ * Whether `move` is a legal reply in `position` (a legal move is played on
+ * `position`). `null` ("(none)") is only legal when the side to move has no
+ * moves at all.
+ */
+export function isLegalEngineMove(
+  position: Chess,
+  move: string | null,
+): boolean {
+  if (move === null) {
+    return position.moves().length === 0;
+  }
+
+  const promotion = move.slice(4) || undefined;
+  try {
+    const played = position.move({
+      from: move.slice(0, 2),
+      to: move.slice(2, 4),
+      promotion,
+    });
+    // chess.js ignores a promotion letter on a move that does not promote.
+    return played.promotion === promotion;
+  } catch {
+    return false;
+  }
+}
+
 function createRealSocket(url: string): StockfishSocket {
   return io(url, {
     // Lazy: nothing connects until the client calls socket.connect().
@@ -92,7 +146,7 @@ const NO_LEGAL_MOVE = '(none)';
 const UCI_MOVE = /^(?:[a-h][1-8][a-h][1-8]|[a-h](?:7[a-h]8|2[a-h]1)[qrbn])$/;
 
 // Only the fields the client uses are validated. `newFEN` and `moveDetails`
-// are unreliable when a player move is sent (see EngineMove) and are ignored.
+// are ignored (see EngineMove and the contract's Caveats).
 const evaluationCompleteSchema = z.object({
   mode: z.literal('move'),
   move: z
@@ -161,8 +215,6 @@ interface ReplyOptions<T> {
   /** Every in-flight wait registers here so disconnect() can cancel it. */
   cancellers: Set<Canceller>;
   parse: (payload: unknown) => T;
-  /** Runs after the listeners are removed and before the promise rejects. */
-  onTimeout?: (error: StockfishClientError) => void;
 }
 
 /**
@@ -180,7 +232,6 @@ function waitForReply<T>({
   timeoutMs,
   cancellers,
   parse,
-  onTimeout,
 }: ReplyOptions<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -222,11 +273,11 @@ function waitForReply<T>({
 
     timer = setTimeout(() => {
       cleanup();
-      const error = new StockfishClientError(
-        `Timed out after ${timeoutMs} ms waiting for ${successEvent}`,
+      reject(
+        new StockfishClientError(
+          `Timed out after ${timeoutMs} ms waiting for ${successEvent}`,
+        ),
       );
-      onTimeout?.(error);
-      reject(error);
     }, timeoutMs);
   });
 }
@@ -248,9 +299,9 @@ export function createStockfishClient({
 
   /**
    * Abandons the socket and session and rejects everything still waiting.
-   * Replies carry no request ID, so once a reply goes missing (a timeout) or
-   * the session fails, the old socket cannot be trusted. The next
-   * startSession() opens a fresh socket and session.
+   * Replies carry no request ID, so once a request fails or the session
+   * fails, the old socket cannot be trusted: a reply may still be on its way.
+   * The next startSession() opens a fresh socket and session.
    */
   function reset(reason: Error): void {
     const current = socket;
@@ -336,9 +387,12 @@ export function createStockfishClient({
       cancellers,
       parse: parseSessionStarted,
     });
+    // Every evaluate-fen carries its own position, so the session's starting
+    // position is never searched. A valid FEN avoids relying on the server
+    // ignoring an invalid one.
     current.emit('start-session', {
       sessionType: 'player-vs-computer',
-      fen: 'start',
+      fen: DEFAULT_POSITION,
     });
     await reply.catch((error: Error) => {
       // After a timeout the server may still create the session, and a retry
@@ -378,22 +432,9 @@ export function createStockfishClient({
     return session;
   }
 
-  // Returns an engine move promise based on the current board state and difficulty level.
-  async function requestMove({
-    fen,
-    move,
-    level,
-  }: {
-    fen: string;
-    move: string;
-    level: StockfishLevel;
-  }): Promise<EngineMove> {
-    // TypeScript can be bypassed (e.g. `as StockfishLevel`), so check at runtime.
-    if (!isStockfishLevel(level)) {
-      throw new StockfishClientError(
-        `Difficulty level must be an integer from 1 to 5 (received ${String(level)})`,
-      );
-    }
+  /** Asks the engine for its reply to the position after the player's move. */
+  async function requestMove(request: MoveRequest): Promise<EngineMove> {
+    const position = validateMoveRequest(request);
 
     const current = socket;
     if (!current || !sessionReady) {
@@ -422,14 +463,39 @@ export function createStockfishClient({
         timeoutMs,
         cancellers,
         parse: parseEvaluationComplete,
-        // A late reply would be matched to the next request, so abandon this
-        // socket. Callers start a new session before requesting again.
-        onTimeout: reset,
       });
-      // Difficulty maps directly to the server's search depth (level 3 means
-      // `go depth 3`), as confirmed by the team, so it is sent unchanged.
-      current.emit('evaluate-fen', { fen, move, level });
-      return await reply;
+      // `move` is always empty: the player's move is already in `fen`. The
+      // server would throw on a missing `move`, so it is sent as ''.
+      // Difficulty maps directly to the server's search depth, so `level` is
+      // sent unchanged.
+      current.emit('evaluate-fen', {
+        fen: request.fen,
+        move: '',
+        level: request.level,
+      });
+      const result = await reply;
+
+      // A reply that is not legal here answers some other request (or the
+      // server is out of step), so it must not reach the board.
+      if (!isLegalEngineMove(position, result.move)) {
+        throw new StockfishClientError(
+          `Engine reply ${result.move ?? '(none)'} is not legal in the requested position`,
+        );
+      }
+      return result;
+    } catch (error) {
+      // After a timeout, server error, disconnect, or bad reply, a late reply
+      // could still arrive and be matched to the next request. Abandon the
+      // socket; callers start a new session before requesting again. If the
+      // client was already reset (disconnect() or session-error), skip this.
+      if (socket === current) {
+        reset(
+          new StockfishClientError(
+            'Stockfish session was reset after a failed move request.',
+          ),
+        );
+      }
+      throw error;
     } finally {
       pending = false;
     }
