@@ -38,8 +38,9 @@ export function createAuthGateway(client: typeof apiClient): AuthGateway {
 
     async validate(token) {
       try {
-        await client.post<unknown, undefined>('/auth/validate', undefined, {
+        await client.post('/auth/validate', undefined, {
           headers: { Authorization: `Bearer ${token}` },
+          responseType: 'text',
         });
         return true;
       } catch (error) {
