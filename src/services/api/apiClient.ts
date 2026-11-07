@@ -7,6 +7,7 @@ import {
   RequestOptions,
 } from '../../types/apiClient.types';
 import { AppError } from './apiError';
+import { tokenStore } from '../storage/TokenStore';
 
 // 10 second timeout
 export const REQUEST_TIMEOUT_MS = 10_000;
@@ -38,7 +39,8 @@ class ApiClient implements ApiClientInterface {
   private async request<T>(
     endpoint: string,
     options: RequestInit,
-  ): Promise<T | null> {
+    responseType: 'json' | 'text' = 'json',
+  ): Promise<T | string | null> {
     const url = `${this.apiBaseUrl}${endpoint}`;
 
     const controller = new AbortController();
@@ -93,8 +95,11 @@ class ApiClient implements ApiClientInterface {
         headers.set(key, value);
       });
 
-      headers.set('Accept', 'application/json');
-      if (token) {
+      headers.set(
+        'Accept',
+        responseType === 'text' ? 'text/plain' : 'application/json',
+      );
+      if (token && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${token}`);
       }
 
@@ -131,6 +136,10 @@ class ApiClient implements ApiClientInterface {
       const responseText = await response.text();
       if (responseText.trim() === '') {
         return null;
+      }
+
+      if (responseType === 'text') {
+        return responseText;
       }
 
       try {
@@ -171,31 +180,90 @@ class ApiClient implements ApiClientInterface {
     }
   }
 
-  get<T>(endpoint: string, options?: RequestOptions) {
-    return this.request<T>(endpoint, {
-      ...options,
-      method: 'GET',
-    });
+  get<T>(
+    endpoint: string,
+    options?: RequestOptions & { responseType?: 'json' },
+  ): Promise<T | null>;
+  get(
+    endpoint: string,
+    options: RequestOptions & { responseType: 'text' },
+  ): Promise<string | null>;
+  get<T>(
+    endpoint: string,
+    options?: RequestOptions,
+  ): Promise<T | string | null> {
+    const { responseType = 'json', ...requestOptions } = options ?? {};
+    return this.request<T>(
+      endpoint,
+      { ...requestOptions, method: 'GET' },
+      responseType,
+    );
   }
 
-  post<T, B = unknown>(endpoint: string, body: B, options?: RequestOptions) {
-    return this.request<T>(endpoint, {
-      ...options,
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
+  post<T, B = unknown>(
+    endpoint: string,
+    body: B,
+    options?: RequestOptions & { responseType?: 'json' },
+  ): Promise<T | null>;
+  post(
+    endpoint: string,
+    body: unknown,
+    options: RequestOptions & { responseType: 'text' },
+  ): Promise<string | null>;
+  post<T, B = unknown>(
+    endpoint: string,
+    body: B,
+    options?: RequestOptions,
+  ): Promise<T | string | null> {
+    const { responseType = 'json', ...requestOptions } = options ?? {};
+    return this.request<T>(
+      endpoint,
+      { ...requestOptions, method: 'POST', body: JSON.stringify(body) },
+      responseType,
+    );
   }
 
-  put<T, B = unknown>(endpoint: string, body: B, options?: RequestOptions) {
-    return this.request<T>(endpoint, {
-      ...options,
-      method: 'PUT',
-      body: JSON.stringify(body),
-    });
+  put<T, B = unknown>(
+    endpoint: string,
+    body: B,
+    options?: RequestOptions & { responseType?: 'json' },
+  ): Promise<T | null>;
+  put(
+    endpoint: string,
+    body: unknown,
+    options: RequestOptions & { responseType: 'text' },
+  ): Promise<string | null>;
+  put<T, B = unknown>(
+    endpoint: string,
+    body: B,
+    options?: RequestOptions,
+  ): Promise<T | string | null> {
+    const { responseType = 'json', ...requestOptions } = options ?? {};
+    return this.request<T>(
+      endpoint,
+      { ...requestOptions, method: 'PUT', body: JSON.stringify(body) },
+      responseType,
+    );
   }
 
-  delete<T>(endpoint: string, options?: RequestOptions) {
-    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  delete<T>(
+    endpoint: string,
+    options?: RequestOptions & { responseType?: 'json' },
+  ): Promise<T | null>;
+  delete(
+    endpoint: string,
+    options: RequestOptions & { responseType: 'text' },
+  ): Promise<string | null>;
+  delete<T>(
+    endpoint: string,
+    options?: RequestOptions,
+  ): Promise<T | string | null> {
+    const { responseType = 'json', ...requestOptions } = options ?? {};
+    return this.request<T>(
+      endpoint,
+      { ...requestOptions, method: 'DELETE' },
+      responseType,
+    );
   }
 }
 
@@ -207,4 +275,5 @@ export function createApiClient(options: ApiClientOptions): ApiClientInterface {
 export const apiClient = createApiClient({
   baseUrl: env.apiBaseUrl,
   timeoutMs: REQUEST_TIMEOUT_MS,
+  tokenProvider: tokenStore.getToken,
 });
