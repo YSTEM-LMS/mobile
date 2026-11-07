@@ -6,12 +6,12 @@ export const ProfileResponseSchema = z.object({
     .string()
     .transform((s) => s.toLowerCase())
     .pipe(z.enum(['student', 'mentor'])),
-  first_name: z.string().nullish(),
-  last_name: z.string().nullish(),
+  firstName: z.string().nullish(),
+  lastName: z.string().nullish(),
   email: z.string().nullish(),
-  zip_code: z.string().nullish(),
+  zipcode: z.string().nullish(),
   gender: z.string().nullish(),
-  grade_level: z.string().nullish(),
+  gradeLevel: z.string().nullish(),
   country: z.string().nullish(),
   state: z.string().nullish(),
   school: z.string().nullish(),

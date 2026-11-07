@@ -7,8 +7,8 @@ const join = (parts: (string | null)[], sep: string) =>
   parts.filter(Boolean).join(sep) || null;
 
 export function mapProfile(r: ProfileResponse): Profile {
-  const firstName = clean(r.first_name);
-  const lastName = clean(r.last_name);
+  const firstName = clean(r.firstName);
+  const lastName = clean(r.lastName);
   const state = clean(r.state);
   const country = clean(r.country);
   return {
@@ -18,9 +18,9 @@ export function mapProfile(r: ProfileResponse): Profile {
     lastName,
     fullName: join([firstName, lastName], ' '),
     email: clean(r.email),
-    zipCode: clean(r.zip_code),
+    zipCode: clean(r.zipcode),
     gender: clean(r.gender),
-    gradeLevel: clean(r.grade_level),
+    gradeLevel: clean(r.gradeLevel),
     country,
     state,
     school: clean(r.school),

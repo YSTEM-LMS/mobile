@@ -8,8 +8,18 @@ import {
 } from 'expo-router/testing-library';
 
 import { renderAnonymous } from './fixtures/renderAnonymous';
+import { createFakeProfileGateway } from '@/features/profile/api/fakeProfileGateway';
+import { setProfileGatewayForTests } from '@/features/profile/api/gatewayProvider';
 
 describe('session-aware navigation', () => {
+  beforeEach(() => {
+    setProfileGatewayForTests(createFakeProfileGateway({ delayMs: 0 }));
+  });
+
+  afterEach(() => {
+    setProfileGatewayForTests(null);
+  });
+
   it('redirects an anonymous user away from a protected route', async () => {
     const renderedRouter = await renderAnonymous('/mentor');
 
