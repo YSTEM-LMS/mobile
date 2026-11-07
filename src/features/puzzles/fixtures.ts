@@ -34,7 +34,6 @@ export const minimalPuzzleFixture: BackendPuzzle = {
   puzzleId: 'test-003',
   FEN: 'sample-position-3',
   moves: 'move6 move7',
-  rating: 2000,
 };
 
 /** Sample response containing multiple backend puzzle objects. */
@@ -43,3 +42,17 @@ export const rawPuzzleFixtures: BackendPuzzle[] = [
   partialPuzzleFixture,
   minimalPuzzleFixture,
 ];
+
+/** Sample puzzle containing null optional fields. */
+export const nullOptionalFieldsPuzzleFixture: BackendPuzzle = {
+  puzzleId: 'test-null',
+  FEN: 'sample-position-null',
+  moves: 'move1 move2',
+  rating: null,
+  ratingDeviation: null,
+  popularity: null,
+  nbPlays: null,
+  themes: null,
+  gameUrl: null,
+  openingTags: null,
+};

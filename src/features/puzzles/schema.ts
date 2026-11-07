@@ -8,13 +8,15 @@ export const backendPuzzleSchema = z.object({
   puzzleId: z.string().min(1),
   FEN: z.string().min(1),
   moves: z.string().min(1),
-  rating: z.number(),
-  ratingDeviation: z.number().optional(),
-  popularity: z.number().optional(),
-  nbPlays: z.number().optional(),
-  themes: z.string().optional(),
-  gameUrl: z.string().optional(),
-  openingTags: z.string().optional(),
+
+  // Optional backend fields may be omitted or explicitly null.
+  rating: z.number().nullish(),
+  ratingDeviation: z.number().nullish(),
+  popularity: z.number().nullish(),
+  nbPlays: z.number().nullish(),
+  themes: z.string().nullish(),
+  gameUrl: z.string().nullish(),
+  openingTags: z.string().nullish(),
 });
 
 // Validates an array of backend puzzle objects.
