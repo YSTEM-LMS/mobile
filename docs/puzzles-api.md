@@ -1,42 +1,74 @@
 # Puzzles API Contract
 
-This page documents the agreement between the backend and the puzzle feature - what the YSTEM backend sends for puzzles, what the app gives to screens, and how the two are connected.
+This document describes the verified YSTEM puzzle endpoint, the mobile-facing puzzle type, and how the data layer integrates with the shared API client.
 
 Code lives in `src/features/puzzles/`. Screens use the `useRandomPuzzles` hook and never call `fetch` directly.
 
-## Endpoint
+## Endpoint and verified response
 
-Current implementation assumes `GET /puzzles/random?limit=20` returns a JSON array of puzzle objects until we can verify the response structure against the running backend. The limit defaults to 20.
+`GET /puzzles/random?limit=20` returns a **bare JSON array** of puzzle objects. The backend defaults `limit` to 20 when a usable limit is not provided. This was confirmed by inspecting the backend code located at `middlewareNode/src/routes/puzzles.js` in the existing YSTEM REACT repository (YSTEM-LMS/react). The request (`GET /puzzles/random?limit=2`) returned HTTP 200 with two puzzle objects.
 
-| Backend field     | Type   | Required | App field (`Puzzle`)                   |
-| ----------------- | ------ | -------- | -------------------------------------- |
-| `puzzleId`        | string | yes      | `id`                                   |
-| `FEN` (uppercase) | string | yes      | `fen`                                  |
-| `moves`           | string | yes      | `moves: string[]`                      |
-| `rating`          | number | yes      | `rating`                               |
-| `ratingDeviation` | number | no       | `ratingDeviation`                      |
-| `popularity`      | number | no       | `popularity`                           |
-| `nbPlays`         | number | no       | `plays`                                |
-| `themes`          | string | no       | `themes: string[]` (`[]` if none)      |
-| `gameUrl`         | string | no       | `gameUrl`                              |
-| `openingTags`     | string | no       | `openingTags: string[]` (`[]` if none) |
+The random endpoint uses MongoDB's `$sample` to select random puzzles and returns them with their original fields, including MongoDB's `_id`. Local sample puzzles also include capitalized fields (`Moves`, `Themes`, `Rating`). However, our mobile data layer uses the lowercase fields defined in the backend model. Zod automatically removes any extra fields that aren't defined in our schema.
 
-Field names are case-sensitive: `FEN` is uppercase, `moves` and `themes` are lowercase.
+| Backend field     | Type                      | Required | App field (`Puzzle`)                   |
+| ----------------- | ------------------------- | -------- | -------------------------------------- |
+| `puzzleId`        | string                    | yes      | `id: string`                           |
+| `FEN`             | string                    | yes      | `fen: string`                          |
+| `moves`           | string                    | yes      | `moves: string[]`                      |
+| `rating`          | number / `null` / omitted | no       | `rating?: number`                      |
+| `ratingDeviation` | number / `null` / omitted | no       | `ratingDeviation?: number`             |
+| `popularity`      | number / `null` / omitted | no       | `popularity?: number`                  |
+| `nbPlays`         | number / `null` / omitted | no       | `plays?: number`                       |
+| `themes`          | string / `null` / omitted | no       | `themes: string[]` (`[]` if missing)   |
+| `gameUrl`         | string / `null` / omitted | no       | `gameUrl?: string`                     |
+| `openingTags`     | string / `null` / omitted | no       | `openingTags: string[]` (`[]` if none) |
 
-`moves`,`themes`, and `openingTags` are space-separated strings. For example, `'c2d1 e6e1 d1e1'` becomes `['c2d1', 'e6e1', 'd1e1']`.
+The backend's puzzle model (`middlewareNode/src/models/puzzles.js`) defines which fields are required and which are optional. The backend permits optional fields to be omitted or explicitly set to `null`. The mobile schema accepts either case and the mapper converts `null` to `undefined` for optional scalar fields or `[]` for tag arrays.
 
-## Data flow
+Field names are case-sensitive: The backend model uses uppercase `FEN` and lowercase `moves`, `rating`, and `themes`.
 
-`client.get()` → `backendPuzzlesResponseSchema` (Zod) → `mapPuzzles()` → `Puzzle[]`
+`moves`,`themes`, and `openingTags` are space-separated strings. For example, `'c2d1 e6e1 d1e1'` maps to `['c2d1', 'e6e1', 'd1e1']`.
 
-Nothing reaches feature code until it has passed the Zod schema. If the request fails or the data does not match, the data layer throws a `PuzzleDataError` instead of crashing the screen:
+### Move sequence interpretation
 
-| `kind`             | Meaning                                                             |
-| ------------------ | ------------------------------------------------------------------- |
-| `request-failed`   | No usable response (offline, timeout, server error).                |
-| `invalid-response` | The backend answered, but the data did not match the puzzle schema. |
+The existing YSTEM web application (`react-ystemandchess/src/features/puzzles/Puzzles.tsx`) uses the `moves` field to determine the order of moves in a puzzle.
 
-The error `message` is safe to show to students. The underlying error is kept in `originalError` for debugging only.
+When a puzzle starts, the application:
+
+- Sets up the chessboard using the puzzle's `FEN`.
+- Assigns the student the opposite color of the player whose turn it is in the `FEN`.
+- Automatically plays the opponent's first move.
+- Waits for the student to make the next move.
+- Alternates between student and opponent moves until the puzzle is completed.
+
+The move sequence follows this order:
+
+- `moves[0]` — Opponent's initial move (played automatically).
+- `moves[1]` — Student's first move.
+- `moves[2]` — Opponent's next move.
+- `moves[3]` — Student's next move, and so on.
+
+This behavior was confirmed from YSTEM's existing web application.
+
+## Shared API integration
+
+Our puzzle data layer uses the shared API client (`src/services/api/apiClient.ts`) to request real puzzles from the YSTEM backend. The shared client gets the backend URL from `EXPO_PUBLIC_API_BASE_URL` through `src/config/env.ts`. It handles HTTP requests, JSON responses, timeouts, and request cancellation.
+`useRandomPuzzles(limit)` passes TanStack Query's `AbortSignal` to `fetchRandomPuzzles()`, which forwards it to `client.get('/puzzles/random?limit=<limit>', { signal })`. **The screen must not call the backend directly.**
+
+The feature keeps `createFakePuzzleClient()` in `fakeClient.ts` for tests. A test can inject it with `useRandomPuzzles(20, fakeClient)` or pass it directly to `fetchRandomPuzzles(fakeClient)`.
+
+## Data flow and errors
+
+`apiClient.get()` → `backendPuzzlesResponseSchema` (Zod) → `mapPuzzles()` → `Puzzle[]`
+
+Only validated, mapped puzzles are returned to the hook. Errors remain `PuzzleDataError` objects with user-friendly messages and the original cause stored in `originalError`:
+
+| `kind`             | Meaning                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------- |
+| `request-failed`   | HTTP/network failures, timeouts, cancellations, or other failures while requesting puzzles. |
+| `invalid-response` | Malformed JSON reported by the shared client or JSON failing the puzzle Zod schema.         |
+
+A successful but empty response body becomes `null` in the shared client and then fails the array schema as `invalid-response`. A valid empty array (`[]`) is accepted and maps to an empty list.
 
 ## Using it
 
@@ -46,28 +78,21 @@ const { puzzles, isLoading, isError, error, isRefetching, refetch } =
 ```
 
 - `puzzles` is `undefined` until the first load succeeds.
-- `isLoading` means there are no puzzles yet and a request is pending. It is also true while retrying after an error.
-- `refetch` is the Retry button, and also fetches a fresh random batch.
+- `isLoading` means a request is pending without successful data yet.
+- `refetch` retries a request or fetches another batch.
 - The query key is `['puzzles', 'random', limit]`.
-
-## Fake API Client for Development purposes
-
-The puzzle feature talks to the backend through a `PuzzleApiClient` type (`get(path, { signal })`). `defaultClient.ts` chooses which client to use.
-
-For now, a fake client (`fakeClient.ts`) returns the sample puzzles in `fixtures.ts` because the shared API client is not merged yet. After the shared client merges, `defaultClient.ts` gets updated.
-
-The fixtures use placeholder values in the backend's format. `FEN` and `moves` are not real chess positions, so they cannot be loaded onto a chessboard.
 
 ## Tests:
 
 ```bash
-npm test -- --runInBand puzzle
+npm test -- --runInBand
+npm run typecheck
+npm run lint
+npm run format:check
 ```
 
-This runs the four puzzle test files: `puzzleSchema`, `puzzleMapper`, `puzzleApi` and `useRandomPuzzles`.
+The older fixtures in `fixtures.ts` contain placeholder FEN and move values. Replace them with valid chess positions and UCI moves before using fixtures to render a chessboard; they are currently suitable only for data-layer tests.
 
-## Still need to confirm with the backend:
+## Unanswered questions
 
-- The response is a bare array, not wrapped in an object such as `{ puzzles: [...] }`
-- Optional fields are ommitted when empty, not sent as `null`. `backendPuzzlesResponseSchema` rejects `null`.
-- Whether the backend follows the Lichess Puzzle Database convention, particularly because it is assumed that `moves[0]` represents the opponent's setup move and `moves[1] begins the student's solution. The backend's field names and use of FEN/UCI notation suggest it follows the Lichness format, but this assumption has not yet been verified.
+- **Deployed puzzle data:** We haven't verified whether production puzzles contain explicit `null` values.
