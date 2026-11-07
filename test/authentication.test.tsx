@@ -1,4 +1,6 @@
 import { router } from 'expo-router';
+import { fetch } from 'expo/fetch';
+import * as SecureStore from 'expo-secure-store';
 import {
   act,
   fireEvent,
@@ -16,6 +18,12 @@ import { createQueryClient } from '@/providers/QueryProvider';
 import { SessionProvider, useSession } from '@/providers/SessionProvider';
 import { renderAnonymous } from './fixtures/renderAnonymous';
 import { AppError } from '@/services/api/apiError';
+import { setProfileGatewayForTests } from '@/features/profile/api/gatewayProvider';
+import { createFakeProfileGateway } from '@/features/profile/api/fakeProfileGateway';
+import { profileQueryKey } from '@/features/profile/hooks/useProfile';
+import { env } from '@/config/env';
+
+jest.mock('expo/fetch', () => ({ fetch: jest.fn() }));
 
 const studentToken =
   'eyJ0eXAiOiJKV1QifQ.eyJ1c2VybmFtZSI6InRlc3Qtc3R1ZGVudCIsImZpcnN0TmFtZSI6IlRlc3QiLCJsYXN0TmFtZSI6IlN0dWRlbnQiLCJyb2xlIjoic3R1ZGVudCJ9.fake';
@@ -39,7 +47,13 @@ function MockScreen() {
 }
 
 describe('authentication', () => {
+  beforeEach(() => {
+    setProfileGatewayForTests(createFakeProfileGateway({ delayMs: 0 }));
+    jest.clearAllMocks();
+  });
+
   afterEach(() => {
+    setProfileGatewayForTests(null);
     jest.restoreAllMocks();
   });
 
@@ -322,5 +336,200 @@ describe('authentication', () => {
     expect(renderedRouter.getPathname()).toBe('/sign-in');
     expect(deleteToken).toHaveBeenCalledTimes(2);
     expect(savedToken).toBeNull();
+  });
+
+  it('Login uses the shared client and stores the returned token.', async () => {
+    jest.spyOn(SecureStore, 'getItemAsync').mockResolvedValue(null);
+    const setItem = jest
+      .spyOn(SecureStore, 'setItemAsync')
+      .mockResolvedValue(undefined);
+    const mockedFetch = jest.mocked(fetch);
+    mockedFetch.mockReset();
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: jest
+        .fn()
+        .mockResolvedValue(JSON.stringify({ token: studentToken })),
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    const renderedRouter = renderRouter('./app', { initialUrl: '/sign-in' });
+    await screen.findByText('Welcome back');
+    submitSignIn('test-student', 'test-password');
+
+    await waitFor(() => expect(renderedRouter.getPathname()).toBe('/'));
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(
+      `${env.apiBaseUrl}/auth/login`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'test-student',
+          password: 'test-password',
+        }),
+      }),
+    );
+    expect(setItem).toHaveBeenCalledTimes(1);
+    expect(setItem).toHaveBeenCalledWith('jwt-token', studentToken);
+  });
+
+  it('Valid stored sessions restore successfully.', async () => {
+    const getItem = jest
+      .spyOn(SecureStore, 'getItemAsync')
+      .mockResolvedValue(studentToken);
+    const deleteItem = jest
+      .spyOn(SecureStore, 'deleteItemAsync')
+      .mockResolvedValue(undefined);
+    const mockedFetch = jest.mocked(fetch);
+    mockedFetch.mockReset();
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: jest.fn().mockResolvedValue('OK'),
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    const renderedRouter = renderRouter('./app', { initialUrl: '/sign-in' });
+
+    await waitFor(() => expect(renderedRouter.getPathname()).toBe('/'));
+    expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
+    expect(getItem).toHaveBeenCalledWith('jwt-token');
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).toHaveBeenCalledWith(
+      `${env.apiBaseUrl}/auth/validate`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(deleteItem).not.toHaveBeenCalled();
+  });
+
+  it('Invalid or expired tokens are cleared.', async () => {
+    let savedToken: string | null = studentToken;
+    jest
+      .spyOn(SecureStore, 'getItemAsync')
+      .mockImplementation(async () => savedToken);
+    const deleteItem = jest
+      .spyOn(SecureStore, 'deleteItemAsync')
+      .mockImplementation(async () => {
+        savedToken = null;
+      });
+    const mockedFetch = jest.mocked(fetch);
+    mockedFetch.mockReset();
+    mockedFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+    } as Awaited<ReturnType<typeof fetch>>);
+
+    const renderedRouter = renderRouter('./app', { initialUrl: '/profile' });
+
+    expect(
+      await screen.findByText(
+        'Your session has expired. Please sign in again.',
+      ),
+    ).toBeOnTheScreen();
+    expect(renderedRouter.getPathname()).toBe('/sign-in');
+    expect(mockedFetch).toHaveBeenCalledWith(
+      `${env.apiBaseUrl}/auth/validate`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith('jwt-token');
+    expect(savedToken).toBeNull();
+  });
+
+  it('Temporary validation failures preserve retry behavior.', async () => {
+    let savedToken: string | null = studentToken;
+    jest
+      .spyOn(SecureStore, 'getItemAsync')
+      .mockImplementation(async () => savedToken);
+    const deleteItem = jest
+      .spyOn(SecureStore, 'deleteItemAsync')
+      .mockImplementation(async () => {
+        savedToken = null;
+      });
+    const mockedFetch = jest.mocked(fetch);
+    mockedFetch.mockReset();
+    mockedFetch
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockRejectedValueOnce(
+        new AppError(
+          'REQUEST_TIMEOUT',
+          'The request took too long to complete.',
+        ),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: jest.fn().mockResolvedValue('OK'),
+      } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    const renderedRouter = renderRouter('./app', { initialUrl: '/sign-in' });
+
+    expect(await screen.findByTestId('session-error-screen')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Unable to connect to the server.'),
+    ).toBeOnTheScreen();
+    expect(savedToken).toBe(studentToken);
+    expect(deleteItem).not.toHaveBeenCalled();
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+
+    fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(
+      await screen.findByText('The request took too long to complete.'),
+    ).toBeOnTheScreen();
+    expect(screen.getByTestId('session-error-screen')).toBeOnTheScreen();
+    expect(
+      screen.queryByText('Unable to connect to the server.'),
+    ).not.toBeOnTheScreen();
+    expect(mockedFetch).toHaveBeenCalledTimes(2);
+    expect(savedToken).toBe(studentToken);
+    expect(deleteItem).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(renderedRouter.getPathname()).toBe('/'));
+    expect(screen.getByText('Quick Actions')).toBeOnTheScreen();
+    expect(mockedFetch).toHaveBeenCalledTimes(3);
+    expect(savedToken).toBe(studentToken);
+    expect(deleteItem).not.toHaveBeenCalled();
+  });
+
+  it('Sign Out clears the token, session, and private query data.', async () => {
+    let savedToken: string | null = studentToken;
+    jest
+      .spyOn(SecureStore, 'getItemAsync')
+      .mockImplementation(async () => savedToken);
+    const deleteItem = jest
+      .spyOn(SecureStore, 'deleteItemAsync')
+      .mockImplementation(async () => {
+        savedToken = null;
+      });
+    const mockedFetch = jest.mocked(fetch);
+    mockedFetch.mockReset();
+    mockedFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: jest.fn().mockResolvedValue('OK'),
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+    const queryClient = createQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>
+          <MockScreen />
+        </SessionProvider>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText('authenticated');
+    queryClient.setQueryData(profileQueryKey, { username: 'test-student' });
+    expect(queryClient.getQueryData(profileQueryKey)).toBeDefined();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(await screen.findByText('anonymous')).toBeOnTheScreen();
+    expect(deleteItem).toHaveBeenCalledTimes(1);
+    expect(deleteItem).toHaveBeenCalledWith('jwt-token');
+    expect(savedToken).toBeNull();
+    expect(queryClient.getQueryData(profileQueryKey)).toBeUndefined();
   });
 });
