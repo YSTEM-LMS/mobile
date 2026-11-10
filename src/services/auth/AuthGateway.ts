@@ -20,6 +20,14 @@ export function createAuthGateway(client: typeof apiClient): AuthGateway {
 
         return response?.token ?? '';
       } catch (error) {
+        if (error instanceof AppError && error.status === 400) {
+          throw new AppError(
+            error.code,
+            'Incorrect username or password. Please try again.',
+            error.status,
+          );
+        }
+
         throw error;
       }
     },
