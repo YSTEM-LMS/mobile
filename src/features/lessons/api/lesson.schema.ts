@@ -1,11 +1,19 @@
 import { z } from 'zod';
 
-export const LessonResponseSchema = z.object({
+export const LessonRequestSchema = z.object({
+  piece: z.string().trim().min(1),
   lessonNumber: z.number().int().positive(),
-  // All-caps FEN to match backend field naming
-  startFEN: z.string().trim().min(1),
-  endFEN: z.string().trim().min(1),
-  endSquare: z.string(),
+});
+
+export const LessonResponseSchema = z.object({
+  startFen: z.string().trim().min(1),
+  name: z.string().trim().min(1),
+  info: z.string(),
+  solution: z.string(),
+  goal: z.number(),
+  opponentConstraints: z.array(z.unknown()),
+  maxMoves: z.number().int().nonnegative(),
+  moves: z.array(z.unknown()),
 });
 
 export type LessonResponse = z.infer<typeof LessonResponseSchema>;

@@ -1,8 +1,12 @@
 export type Lesson = {
-  lessonNumber: number;
   startFen: string;
-  endFen: string;
-  endSquare: string | null;
+  name: string;
+  info: string;
+  solution: string;
+  goal: number;
+  opponentConstraints: unknown[];
+  maxMoves: number;
+  moves: unknown[];
 };
 
 export type LessonRequest = {

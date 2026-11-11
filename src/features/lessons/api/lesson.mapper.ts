@@ -1,13 +1,32 @@
-import { LessonResponseSchema, type LessonResponse } from './lesson.schema';
-import type { Lesson } from './lesson.types';
+import {
+  LessonRequestSchema,
+  LessonResponseSchema,
+  type LessonResponse,
+} from './lesson.schema';
+import type { Lesson, LessonRequest } from './lesson.types';
 import { AppError } from '@/services/api/apiError';
+
+export function parseLessonRequest(raw: unknown): LessonRequest {
+  const result = LessonRequestSchema.safeParse(raw);
+  if (!result.success) {
+    throw new AppError(
+      'INVALID_RESPONSE',
+      'Lesson requests require a piece and a positive lesson number.',
+    );
+  }
+  return result.data;
+}
 
 export function mapLesson(r: LessonResponse): Lesson {
   return {
-    lessonNumber: r.lessonNumber,
-    startFen: r.startFEN,
-    endFen: r.endFEN,
-    endSquare: r.endSquare.trim() || null,
+    startFen: r.startFen,
+    name: r.name,
+    info: r.info,
+    solution: r.solution,
+    goal: r.goal,
+    opponentConstraints: r.opponentConstraints,
+    maxMoves: r.maxMoves,
+    moves: r.moves,
   };
 }
 
