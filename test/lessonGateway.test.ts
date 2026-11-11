@@ -39,10 +39,13 @@ describe('Lesson Gateway', () => {
       name: 'Sanitized lesson',
       info: 'Sanitized lesson instructions.',
       solution: 'e2e4',
-      goal: 1,
-      opponentConstraints: [],
+      goal: { type: 'CAPTURE', min: 1 },
+      opponentConstraints: [
+        { type: 'AVOID_CAPTURING' },
+        { type: 'AVOID_SQUARES', squares: ['a1'] },
+      ],
       maxMoves: 10,
-      moves: [],
+      moves: [{ from: 'e2', to: 'e4', piece: 'p' }],
     });
   });
 

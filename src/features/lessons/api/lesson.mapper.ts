@@ -22,11 +22,11 @@ export function mapLesson(r: LessonResponse): Lesson {
     startFen: r.startFen,
     name: r.name,
     info: r.info,
-    solution: r.solution,
-    goal: r.goal,
-    opponentConstraints: r.opponentConstraints,
-    maxMoves: r.maxMoves,
-    moves: r.moves,
+    solution: r.solution ?? null,
+    goal: r.goal ?? null,
+    opponentConstraints: r.opponentConstraints ?? null,
+    maxMoves: r.maxMoves ?? null,
+    moves: r.moves ?? null,
   };
 }
 
