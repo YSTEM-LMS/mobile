@@ -50,7 +50,7 @@ export function createFakeProfileGateway(
   const wait = () => new Promise((r) => setTimeout(r, delayMs));
 
   return {
-    async getProfile() {
+    async getProfile(username?: string) {
       await wait();
       if (failuresLeft > 0) {
         failuresLeft -= 1;
@@ -60,7 +60,15 @@ export function createFakeProfileGateway(
         throw new ProfileError('network', 'Fake network failure');
       if (scenario === 'session-expired')
         throw new ProfileError('session-expired', 'Fake expired session');
-      return parseProfile(samples[scenario]);
+
+      const sample = samples[scenario];
+      // Return the username that was requested, so tests can tell users apart
+      // The invalid-data sample has a non-string username and must stay invalid
+      return parseProfile(
+        username && typeof sample.username === 'string'
+          ? { ...sample, username }
+          : sample,
+      );
     },
   };
 }
