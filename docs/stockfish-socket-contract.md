@@ -170,9 +170,11 @@ Replies:
 
 If the Stockfish binary fails to launch, the server emits `session-error`
 (`"Chess engine failed to start"`) **after** `session-started` has already
-been sent. The mobile client keeps listening for `session-error` while a
-session is in use and invalidates the session when it arrives (see
-[Recovery](#recovery)).
+been sent. The mobile client listens for `session-error` from the moment it
+sends `start-session` until the session ends, and invalidates the session when
+it arrives (see [Recovery](#recovery)). If `session-error` arrives right after
+`session-started`, before `startSession()` has resolved, `startSession()`
+rejects with that error instead of reporting success.
 
 ### `evaluate-fen`
 

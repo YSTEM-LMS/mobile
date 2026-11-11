@@ -295,6 +295,8 @@ export function createStockfishClient({
   let sessionReady = false;
   let pending = false;
   let stopWatchingSession: (() => void) | null = null;
+  /** Why the client last reset; reported by a session start it interrupted. */
+  let resetReason: Error | null = null;
   const cancellers = new Set<Canceller>();
 
   /**
@@ -306,6 +308,7 @@ export function createStockfishClient({
   function reset(reason: Error): void {
     const current = socket;
 
+    resetReason = reason;
     socket = null;
     connecting = null;
     session = null;
@@ -379,6 +382,11 @@ export function createStockfishClient({
   async function openSession(): Promise<void> {
     const current = await ensureConnected();
 
+    // Watch for session-error before session-started arrives: the server can
+    // send both back-to-back, and the second must not slip through while this
+    // function waits to resume after the first.
+    watchSession(current);
+
     const reply = waitForReply({
       socket: current,
       successEvent: 'session-started',
@@ -402,10 +410,15 @@ export function createStockfishClient({
       throw error;
     });
 
-    if (socket === current) {
-      sessionReady = true;
-      watchSession(current);
+    // The session failed (e.g. a session-error right after session-started)
+    // or disconnect() ran before this resumed. Report it instead of success.
+    if (socket !== current) {
+      throw (
+        resetReason ??
+        new StockfishClientError('Stockfish session ended before it was ready.')
+      );
     }
+    sessionReady = true;
   }
 
   function startSession(): Promise<void> {

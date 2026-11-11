@@ -586,6 +586,55 @@ describe('createStockfishClient: recovery', () => {
     expect(second.payloadsFor('start-session')).toHaveLength(1);
   });
 
+  it('rejects startSession() when session-error follows session-started back-to-back', async () => {
+    const { client, sockets } = setupWithFreshSockets();
+
+    const started = client.startSession();
+    const first = sockets[0];
+    first.simulateConnect();
+    await flushPromises();
+    // Both events arrive before the client's startSession() resumes.
+    first.serverEmit('session-started', { success: true, id: 'socket-1' });
+    first.serverEmit('session-error', {
+      error: 'Chess engine failed to start',
+    });
+
+    await expect(started).rejects.toThrow('Chess engine failed to start');
+    expect(first.disconnectCalls).toBe(1);
+    expect(first.listenerCount()).toBe(0);
+
+    // The failed session cannot send a move request.
+    await expect(client.requestMove(MOVE_REQUEST)).rejects.toThrow(
+      'Call startSession()',
+    );
+    expect(first.payloadsFor('evaluate-fen')).toHaveLength(0);
+
+    // Recovery opens a fresh socket and session.
+    const second = await startFreshSession(client, sockets);
+    const result = client.requestMove(MOVE_REQUEST);
+    second.serverEmit('evaluation-complete', ENGINE_REPLY);
+
+    await expect(result).resolves.toEqual({ move: 'e7e5' });
+    expect(sockets).toHaveLength(2);
+    expect(second.payloadsFor('start-session')).toHaveLength(1);
+  });
+
+  it('rejects startSession() when disconnect() runs as session-started arrives', async () => {
+    const { client, socket } = setup();
+
+    const started = client.startSession();
+    socket.simulateConnect();
+    await flushPromises();
+    socket.serverEmit('session-started', { success: true, id: 'socket-1' });
+    client.disconnect();
+
+    await expect(started).rejects.toThrow('Stockfish client disconnected.');
+    expect(socket.listenerCount()).toBe(0);
+    await expect(client.requestMove(MOVE_REQUEST)).rejects.toThrow(
+      'Call startSession()',
+    );
+  });
+
   it('rejects a pending move request when the session fails', async () => {
     const { client, sockets } = setupWithFreshSockets();
     const socket = await startFreshSession(client, sockets);
