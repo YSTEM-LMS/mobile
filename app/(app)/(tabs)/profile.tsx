@@ -26,9 +26,7 @@ import { useState } from 'react';
 import { InlineError } from '@/components/feedback/InlineError';
 import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
 import { Spinner } from '@/components/ui/Spinner';
-// Temporary AppError import until API is merged
-import { AppError } from '@/services/storage/TokenStore';
-
+import { AppError } from '@/services/api/apiError';
 import { ProfileError } from '@/features/profile/api/profile.errors';
 import type { Profile } from '@/features/profile/api/profile.types';
 import { useProfile } from '@/features/profile/hooks/useProfile';
