@@ -521,8 +521,9 @@ describe('authentication', () => {
     );
 
     await screen.findByText('authenticated');
-    queryClient.setQueryData(profileQueryKey, { username: 'test-student' });
-    expect(queryClient.getQueryData(profileQueryKey)).toBeDefined();
+    const profileKey = profileQueryKey('test-student');
+    queryClient.setQueryData(profileKey, { username: 'test-student' });
+    expect(queryClient.getQueryData(profileKey)).toBeDefined();
 
     fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
 
@@ -530,6 +531,6 @@ describe('authentication', () => {
     expect(deleteItem).toHaveBeenCalledTimes(1);
     expect(deleteItem).toHaveBeenCalledWith('jwt-token');
     expect(savedToken).toBeNull();
-    expect(queryClient.getQueryData(profileQueryKey)).toBeUndefined();
+    expect(queryClient.getQueryData(profileKey)).toBeUndefined();
   });
 });
