@@ -368,4 +368,29 @@ describe('API Client', () => {
       });
     });
   });
+
+  it('Later requests use the current token rather than a stale token.', async () => {
+    let token: string | null = 'token-a';
+    const authenticatedClient = createApiClient({
+      baseUrl: 'https://api.example.com',
+      timeoutMs: 10_000,
+      tokenProvider: async () => token,
+    });
+    mockedFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: jest.fn().mockResolvedValue('{}'),
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    await authenticatedClient.get('/protected');
+    token = 'token-b';
+    await authenticatedClient.get('/protected');
+    token = null;
+    await authenticatedClient.get('/protected');
+
+    const sentTokens = mockedFetch.mock.calls.map(([, options]) =>
+      new Headers(options?.headers).get('Authorization'),
+    );
+    expect(sentTokens).toEqual(['Bearer token-a', 'Bearer token-b', null]);
+  });
 });

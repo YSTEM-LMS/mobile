@@ -1,3 +1,4 @@
+import { AppError } from '@/services/api/apiError';
 import { PuzzleDataError } from './errors';
 import { mapPuzzles } from './mapper';
 import { backendPuzzlesResponseSchema } from './schema';
@@ -14,7 +15,7 @@ export const DEFAULT_PUZZLE_LIMIT = 20;
  * - Optionally accepts an AbortSignal to cancel the request.
  * - Returns a Promise containing the response data.
  *
- * Allows use of either a fake API client for development/testing or Brandon's API client when it is available.
+ * Supports both the shared API client and injected fake clients for tests.
  *
  * The response is typed as unknown because it hasn't been validated yet.
  */
@@ -44,7 +45,16 @@ export async function fetchRandomPuzzles(
     // Request puzzles from GET /puzzles/random?limit=<limit>.
     payload = await client.get(`/puzzles/random?limit=${limit}`, { signal });
   } catch (error) {
-    // If the request fails (ex. network error), throw a controlled error with a message instead of exposing the original error.
+    // Invalid JSON from the shared client is a response error, not a network error.
+    if (error instanceof AppError && error.code === 'INVALID_RESPONSE') {
+      throw new PuzzleDataError(
+        'invalid-response',
+        'The puzzle server sent data the app could not read. Please try again later.',
+        error,
+      );
+    }
+
+    // Network, timeout, cancellation, and other request errors stay controlled.
     throw new PuzzleDataError(
       'request-failed',
       'Puzzles could not be loaded. Check your connection and try again.',

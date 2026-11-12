@@ -10,7 +10,7 @@ export type Puzzle = {
   // Moves in UCI notation ex. "c2d1".
   // The first move is the opponent's setup move, solution starts from the second move.
   moves: string[];
-  rating: number;
+  rating?: number;
   ratingDeviation?: number;
   popularity?: number;
   // Backend nbPlays

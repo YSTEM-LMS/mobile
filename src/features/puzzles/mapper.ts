@@ -2,8 +2,8 @@ import type { BackendPuzzle } from './schema';
 import type { Puzzle } from './types';
 
 // Converts space-separated backend values into arrays.
-// Missing or blank optional fields become empty arrays.
-function splitWords(value: string | undefined): string[] {
+// Null, undefined, and blank values become empty arrays.
+function splitWords(value: string | null | undefined): string[] {
   return value?.trim().split(/\s+/).filter(Boolean) ?? [];
 }
 
@@ -13,12 +13,12 @@ export function mapPuzzle(puzzle: BackendPuzzle): Puzzle {
     id: puzzle.puzzleId,
     fen: puzzle.FEN,
     moves: splitWords(puzzle.moves),
-    rating: puzzle.rating,
-    ratingDeviation: puzzle.ratingDeviation,
-    popularity: puzzle.popularity,
-    plays: puzzle.nbPlays,
+    rating: puzzle.rating ?? undefined,
+    ratingDeviation: puzzle.ratingDeviation ?? undefined,
+    popularity: puzzle.popularity ?? undefined,
+    plays: puzzle.nbPlays ?? undefined,
     themes: splitWords(puzzle.themes),
-    gameUrl: puzzle.gameUrl,
+    gameUrl: puzzle.gameUrl ?? undefined,
     openingTags: splitWords(puzzle.openingTags),
   };
 }

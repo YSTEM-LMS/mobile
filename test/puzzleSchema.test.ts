@@ -64,6 +64,36 @@ describe('backendPuzzleSchema', () => {
         expect(result.data.themes).toBe(fullPuzzleFixture.themes);
       }
     });
+
+    it('accepts a puzzle without a rating', () => {
+      const puzzle = omit(fullPuzzleFixture, 'rating');
+
+      expect(backendPuzzleSchema.safeParse(puzzle).success).toBe(true);
+    });
+
+    it('accepts a puzzle with a null rating', () => {
+      const puzzle = {
+        ...fullPuzzleFixture,
+        rating: null,
+      };
+
+      expect(backendPuzzleSchema.safeParse(puzzle).success).toBe(true);
+    });
+
+    it('accepts null values for all optional fields', () => {
+      const puzzle = {
+        ...fullPuzzleFixture,
+        rating: null,
+        ratingDeviation: null,
+        popularity: null,
+        nbPlays: null,
+        themes: null,
+        gameUrl: null,
+        openingTags: null,
+      };
+
+      expect(backendPuzzleSchema.safeParse(puzzle).success).toBe(true);
+    });
   });
 
   describe('missing required fields', () => {
@@ -80,7 +110,7 @@ describe('backendPuzzleSchema', () => {
       ).toBe(false);
     });
 
-    it.each(['moves', 'rating'] as const)(
+    it.each(['moves'] as const)(
       'rejects a puzzle that is missing %s',
       (field) => {
         expect(
