@@ -6,7 +6,6 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 
-import { START_FEN } from '@/features/play/services/hooks/useComputerGame';
 import {
   createStockfishClient,
   type EngineMove,
@@ -86,8 +85,7 @@ describe('PlayGameRoute', () => {
 
     await waitFor(() =>
       expect(client.requestMove).toHaveBeenCalledWith({
-        fen: START_FEN,
-        move: 'e2e4',
+        fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
         level: 2,
       }),
     );

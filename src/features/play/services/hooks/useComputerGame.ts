@@ -1,11 +1,12 @@
 import { Chess, type Square } from 'chess.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import {
-  createStockfishClient,
-  type EngineMove,
-  type StockfishClient,
-  type StockfishLevel,
+import { useStockfishClient } from '@/features/play/hooks/useStockfishClient';
+
+import type {
+  EngineMove,
+  StockfishClient,
+  StockfishLevel,
 } from '@/features/play/services/StockfishClient';
 
 export const START_FEN =
@@ -23,7 +24,6 @@ export type ComputerGamePhase =
 export type ComputerGameOutcome = 'win' | 'lose' | 'draw';
 
 type LastMove = { from: Square; to: Square };
-type PendingRequest = { fen: string; move: string };
 
 type UseComputerGameOptions = {
   difficulty?: string;
@@ -61,17 +61,20 @@ function resolveOutcome(game: Chess): ComputerGameOutcome | null {
  * - Only this hook talks to the Stockfish client. Screens and the board never
  *   touch the socket.
  * - Promotion: MVP behavior is to auto-promote to a queen.
- * - Request shape: FEN BEFORE the player's move + the move in UCI.
+ * - Request shape: the player's move is applied to the board first, then the
+ *   resulting FEN (engine to move) is sent with the level. The move itself is
+ *   never sent, so it cannot be applied twice. See
+ *   docs/stockfish-socket-contract.md.
  */
 export function useComputerGame({
   difficulty,
   initialFen = START_FEN,
-  createClient = createStockfishClient,
+  createClient,
 }: UseComputerGameOptions = {}) {
   const level = difficultyToLevel(difficulty);
 
   const [game] = useState(() => new Chess(initialFen));
-  const [client] = useState(() => createClient());
+  const client = useStockfishClient(createClient);
   const [position, setPosition] = useState(() => game.fen());
   const [lastMove, setLastMove] = useState<LastMove | null>(null);
   const [outcome, setOutcome] = useState<ComputerGameOutcome | null>(null);
@@ -84,8 +87,6 @@ export function useComputerGame({
   // Bumped on unmount and on abandon. Async work compares its own token to
   // this and stops if they differ.
   const tokenRef = useRef(0);
-  // The request to (re)send if the engine call fails.
-  const pendingRef = useRef<PendingRequest | null>(null);
 
   const setPhase = useCallback((next: ComputerGamePhase) => {
     phaseRef.current = next;
@@ -136,9 +137,6 @@ export function useComputerGame({
 
   const runEngineTurn = useCallback(
     async (token: number) => {
-      const pending = pendingRef.current;
-      if (!pending) return;
-
       setErrorMessage(null);
       setPhase('engine-turn');
 
@@ -148,11 +146,7 @@ export function useComputerGame({
         // itself (timeout, session error) this opens a fresh session.
         await client.startSession();
         if (tokenRef.current !== token) return;
-        reply = await client.requestMove({
-          fen: pending.fen,
-          move: pending.move,
-          level,
-        });
+        reply = await client.requestMove({ fen: game.fen(), level });
       } catch (error) {
         if (tokenRef.current !== token) return;
         fail('engine-failed', error);
@@ -181,7 +175,6 @@ export function useComputerGame({
         return;
       }
 
-      pendingRef.current = null;
       if (!publish(from, to)) setPhase('player-turn');
     },
     [client, fail, game, level, publish, setPhase],
@@ -191,25 +184,13 @@ export function useComputerGame({
     (from: Square, to: Square): boolean => {
       if (phaseRef.current !== 'player-turn') return false;
 
-      const fenBefore = game.fen();
-      let applied;
       try {
-        applied = game.move({ from, to, promotion: 'q' });
+        game.move({ from, to, promotion: 'q' });
       } catch {
         return false;
       }
 
-      // Contract: position BEFORE the player's move + the move. The engine's
-      // reply is applied once, to our own board.
-      pendingRef.current = {
-        fen: fenBefore,
-        move: `${from}${to}${applied.promotion ?? ''}`,
-      };
-
-      if (publish(from, to)) {
-        pendingRef.current = null;
-        return true;
-      }
+      if (publish(from, to)) return true;
       void runEngineTurn(tokenRef.current);
       return true;
     },
@@ -239,9 +220,8 @@ export function useComputerGame({
 
     return () => {
       tokenRef.current += 1;
-      client.disconnect();
     };
-  }, [begin, client]);
+  }, [begin]);
 
   return {
     position,

@@ -11,8 +11,15 @@ import type {
   StockfishClient,
 } from '@/features/play/services/StockfishClient';
 
+import { createFakeStockfishClient } from '@/features/play/services/fakeStockfishClient';
+
 type MoveRequest = Parameters<StockfishClient['requestMove']>[0];
 type Hook = { current: ReturnType<typeof useComputerGame> };
+
+// Position after White's 1. e4, Black to move. The engine request must carry
+// this FEN and no separate move.
+const FEN_AFTER_E4 =
+  'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
 
 /** A scripted stand-in for the Stockfish client. No sockets involved. */
 class FakeClient implements StockfishClient {
@@ -146,7 +153,8 @@ describe('useComputerGame: session and moves', () => {
     });
     expect(pieceAt(result.current.position, 'e2')).toBeFalsy();
     expect(result.current.lastMove).toEqual({ from: 'e2', to: 'e4' });
-    expect(fake.requests).toEqual([{ fen: START_FEN, move: 'e2e4', level: 4 }]);
+    // Position AFTER e4, and no separate move.
+    expect(fake.requests).toEqual([{ fen: FEN_AFTER_E4, level: 4 }]);
 
     await act(async () => {
       reply.resolve({ move: 'e7e5' });
@@ -173,14 +181,12 @@ describe('useComputerGame: session and moves', () => {
 
     play(result, 'e2', 'e4');
     await settle();
-    const afterFirstExchange = result.current.position;
 
     expect(play(result, 'g1', 'f3')).toBe(true);
     await settle();
 
     expect(fake.requests[1]).toEqual({
-      fen: afterFirstExchange,
-      move: 'g1f3',
+      fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2',
       level: 1,
     });
     const board = new Chess(result.current.position);
@@ -244,7 +250,10 @@ describe('useComputerGame: promotion', () => {
       type: 'q',
       color: 'w',
     });
-    expect(fake.requests).toEqual([{ fen, move: 'a7a8q', level: 1 }]);
+    // The promotion is already on the board in the FEN. No move is sent.
+    expect(fake.requests).toEqual([
+      { fen: 'Q7/7k/8/8/8/8/8/K7 b - - 0 1', level: 1 },
+    ]);
   });
 });
 
@@ -320,8 +329,8 @@ describe('useComputerGame: failures', () => {
 
     expect(result.current.phase).toBe('player-turn');
     expect(fake.requests).toEqual([
-      { fen: START_FEN, move: 'e2e4', level: 1 },
-      { fen: START_FEN, move: 'e2e4', level: 1 },
+      { fen: FEN_AFTER_E4, level: 1 },
+      { fen: FEN_AFTER_E4, level: 1 },
     ]);
     // A fresh session is opened right before the retried request.
     expect(fake.calls.slice(-2)).toEqual(['startSession', 'requestMove']);
@@ -426,5 +435,26 @@ describe('useComputerGame: game over', () => {
     expect(result.current.outcome).toBe('lose');
     expect(play(result, 'f2', 'f3')).toBe(false);
     expect(fake.requests).toHaveLength(1);
+  });
+});
+
+describe('useComputerGame: with the shared fake client', () => {
+  it('plays an exchange against the fixture replies', async () => {
+    const fake = createFakeStockfishClient();
+    const { result } = renderHook(() =>
+      useComputerGame({ createClient: () => fake }),
+    );
+    await settle();
+
+    expect(play(result, 'e2', 'e4')).toBe(true);
+    await settle();
+
+    expect(fake.sessionsStarted).toBe(1);
+    expect(fake.requests).toEqual([{ fen: FEN_AFTER_E4, level: 1 }]);
+    expect(pieceAt(result.current.position, 'e5')).toEqual({
+      type: 'p',
+      color: 'b',
+    });
+    expect(result.current.phase).toBe('player-turn');
   });
 });
