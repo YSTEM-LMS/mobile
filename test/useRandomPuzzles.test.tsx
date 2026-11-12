@@ -73,11 +73,7 @@ describe('useRandomPuzzles', () => {
     expect(result.current.isError).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.puzzles).toHaveLength(rawPuzzleFixtures.length);
-    expect(result.current.puzzles?.[0].moves).toEqual([
-      'move1',
-      'move2',
-      'move3',
-    ]);
+    expect(result.current.puzzles?.[0].moves).toEqual(['g1f3', 'b8c6', 'f1c4']);
     expect(get.mock.calls[0][0]).toBe('/puzzles/random?limit=5');
   });
 

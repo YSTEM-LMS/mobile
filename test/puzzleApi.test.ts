@@ -101,8 +101,8 @@ describe('fetchRandomPuzzles', () => {
       expect(puzzles).toHaveLength(rawPuzzleFixtures.length);
       expect(puzzles[0]).toMatchObject({
         id: 'test-001',
-        fen: 'sample-position-1',
-        moves: ['move1', 'move2', 'move3'],
+        fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2',
+        moves: ['g1f3', 'b8c6', 'f1c4'],
         themes: ['theme1', 'theme2', 'theme3'],
       });
     });

@@ -1,11 +1,12 @@
 /**
- * puzzles.tsx — Daily Puzzles Screen
+ * puzzles.tsx — Puzzles Screen
  * UI/UX design by Sandith Hewage (Y STEM and Chess)
  */
 
+// React state tracks which puzzle in the loaded batch is selected.
 import { useState } from 'react';
 import {
-  Animated,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// Reuse the shared chessboard
+import { ChessBoard_component } from '@/components/chess/Chessboard-component';
 import { theme } from '@/design/theme';
 import {
   fontSizes,
@@ -22,302 +25,280 @@ import {
   radii,
   spacing,
 } from '@/design/tokens';
+// The hook handles loading puzzles, errors, caching, and refetching.
+import { useRandomPuzzles } from '@/features/puzzles/useRandomPuzzles';
 
-type PuzzleState = 'solving' | 'correct' | 'incorrect';
+// Displays one label/value pair, such as Rating: 1200.
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <View style={s.detailRow}>
+      <Text style={s.detailLabel}>{label}</Text>
+      <Text style={s.detailValue}>{value}</Text>
+    </View>
+  );
+}
 
-type Puzzle = {
-  id: number;
-  rating: number;
-  themes: string[];
-  hint: string;
-  description: string;
-  solution: string;
-};
-
-const PUZZLE: Puzzle = {
-  id: 4821,
-  rating: 1287,
-  themes: ['Fork', 'Knight', 'Intermediate'],
-  hint: 'Look for a Knight move that attacks two pieces at once.',
-  description: 'White to move. Find the Knight fork that wins material.',
-  solution: 'Nd5 — forks the Queen on c7 and Rook on e7',
-};
-
-function ChessBoard({ state }: { state: PuzzleState }) {
-  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-  const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
-  const overlayColor =
-    state === 'correct'
-      ? 'rgba(127,204,38,0.18)'
-      : state === 'incorrect'
-        ? 'rgba(214,69,69,0.18)'
-        : null;
+// Displays a group of tags, or nothing if there are no tags.
+function Tags({ title, values }: { title: string; values: string[] }) {
+  if (values.length === 0) {
+    return null;
+  }
 
   return (
-    <View style={b.board}>
-      {/* Grid */}
-      {ranks.map((rank) => (
-        <View key={rank} style={b.row}>
-          {files.map((file, fi) => (
-            <View
-              key={file + rank}
-              style={[(fi + rank) % 2 === 0 ? b.light : b.dark]}
-            />
-          ))}
-        </View>
-      ))}
-
-      {/* Result overlay */}
-      {overlayColor && (
-        <View style={[b.overlay, { backgroundColor: overlayColor }]}>
-          <Text style={b.overlayIcon}>{state === 'correct' ? '✓' : '✗'}</Text>
-        </View>
-      )}
-
-      {/* Turn indicator */}
-      <View style={b.turnChip}>
-        <View style={b.turnDot} />
-        <Text style={b.turnText}>White to move</Text>
+    <View style={s.tagSection}>
+      <Text style={s.sectionLabel}>{title}</Text>
+      <View style={s.themes}>
+        {/** Create one pill for each theme or opening tag. */}
+        {values.map((value, index) => (
+          <View key={`${value}-${index}`} style={s.themePill}>
+            <Text style={s.themeText}>{value}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
 }
 
+// Main Puzzle screen
+// Displays data but does not play or grade moves.
 export default function PuzzlesRoute() {
-  const [state, setState] = useState<PuzzleState>('solving');
-  const [hintShown, setHintShown] = useState(false);
-  const [streak, setStreak] = useState(5);
-  const [solutionShown, setSolutionShown] = useState(false);
+  // Which puzzle to show from the batch (starting with the first).
+  const [currentIndex, setCurrentIndex] = useState(0);
+  // Fetch validated puzzles through the existing data layer, not directly with fetch().
+  const { puzzles, isLoading, isError, error, isRefetching, refetch } =
+    useRandomPuzzles();
 
-  const [resultScale] = useState(() => new Animated.Value(0));
+  // Use 0 while no batch is available, and keep the index inside the batch.
+  const count = puzzles?.length ?? 0;
+  const activeIndex = Math.min(currentIndex, Math.max(count - 1, 0));
+  // Only show a puzzle when the hook is not loading or reporting an error.
+  const puzzle = !isLoading && !isError ? puzzles?.[activeIndex] : undefined;
 
-  const showResult = (newState: 'correct' | 'incorrect') => {
-    setState(newState);
-    Animated.spring(resultScale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 20,
-      bounciness: 12,
-    }).start();
-    if (newState === 'correct') {
-      setStreak((n) => n + 1);
-    } else {
-      setStreak(0);
+  // The recorded first move belongs to the opponent, so the preview faces the student.
+  const boardOrientation =
+    puzzle?.fen.trim().split(/\s+/)[1] === 'w' ? 'black' : 'white';
+
+  // Request a fresh batch. After success, show its first puzzle.
+  async function handleRefetch() {
+    const result = await refetch();
+    if (result.isSuccess) {
+      setCurrentIndex(0);
     }
-  };
+  }
 
-  const handleNew = () => {
-    resultScale.setValue(0);
-    setState('solving');
-    setHintShown(false);
-    setSolutionShown(false);
-  };
+  // Move through the current batch, or request more when it is exhausted.
+  function handleNext() {
+    if (activeIndex < count - 1) {
+      setCurrentIndex(activeIndex + 1);
+    } else {
+      void handleRefetch();
+    }
+  }
+
+  // Choose a more specific error heading for malformed backend data.
+  const invalidResponse = error?.kind === 'invalid-response';
 
   return (
     <SafeAreaView style={s.safe}>
-      {/* ── Header ─────────────────────────────── */}
+      {/* Header: show the current ID only when a puzzle is available. */}
       <View style={s.header}>
-        <View>
-          <Text style={s.headerSup}>PUZZLE</Text>
-          <Text style={s.headerTitle}>#{PUZZLE.id}</Text>
+        <View style={s.headerSide}>
+          {puzzle && (
+            <>
+              <Text style={s.headerSup}>PUZZLE</Text>
+              <Text style={s.headerTitle} numberOfLines={1}>
+                #{puzzle.id}
+              </Text>
+            </>
+          )}
         </View>
         <Text style={s.headingCenter}>Puzzles</Text>
-        <Pressable style={s.streakChip}>
-          <Text style={s.streakFire}>🔥</Text>
-          <Text style={s.streakCount}>{streak}</Text>
-        </Pressable>
+        {/* Empty right side keeps the centered title aligned. */}
+        <View style={s.headerSide} />
       </View>
 
+      {/* Scrollable body for loading, errors, or puzzle content. */}
       <ScrollView
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Board ──────────────────────────────── */}
-        <View style={s.boardWrap}>
-          <ChessBoard state={state} />
-        </View>
-
-        {/* ── Result Banner ──────────────────────── */}
-        {state !== 'solving' && (
-          <Animated.View
-            style={[
-              s.resultBanner,
-              state === 'correct' ? s.resultBannerCorrect : s.resultBannerWrong,
-              { transform: [{ scale: resultScale }] },
-            ]}
-          >
-            <Text style={s.resultIcon}>
-              {state === 'correct' ? '🎉' : '😕'}
+        {/* Initial loading state. */}
+        {isLoading && !isError && (
+          <View style={s.statusCard}>
+            <ActivityIndicator size="large" color={palette.brandGreen} />
+            <Text style={s.statusTitle}>Loading puzzles</Text>
+            <Text style={s.statusMessage}>
+              Retrieving puzzles from the server…
             </Text>
-            <View style={s.resultContent}>
-              <Text style={s.resultTitle}>
-                {state === 'correct' ? 'Brilliant!' : 'Not quite'}
-              </Text>
-              <Text style={s.resultSub}>
-                {state === 'correct'
-                  ? `+10 bonus XP · Streak: ${streak} 🔥`
-                  : 'Keep going — every attempt teaches you something.'}
-              </Text>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* ── Solution (after wrong) ─────────────── */}
-        {state === 'incorrect' && !solutionShown && (
-          <Pressable
-            onPress={() => setSolutionShown(true)}
-            style={({ pressed }) => [
-              s.solutionToggle,
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Text style={s.solutionToggleText}>Show Solution</Text>
-          </Pressable>
-        )}
-        {state === 'incorrect' && solutionShown && (
-          <View style={s.solutionCard}>
-            <Text style={s.solutionHeader}>✓ SOLUTION</Text>
-            <Text style={s.solutionText}>{PUZZLE.solution}</Text>
           </View>
         )}
 
-        {/* ── Info Panel ─────────────────────────── */}
-        <View style={s.infoCard}>
-          {/* Rating + Description */}
-          <View style={s.infoTop}>
-            <View style={s.ratingBox}>
-              <Text style={s.ratingLabel}>Rating</Text>
-              <Text style={s.ratingValue}>{PUZZLE.rating}</Text>
-            </View>
-            <Text style={s.desc}>{PUZZLE.description}</Text>
-          </View>
-
-          <View style={s.divider} />
-
-          {/* Theme pills */}
-          <View style={s.themes}>
-            {PUZZLE.themes.map((t) => (
-              <View key={t} style={s.themePill}>
-                <Text style={s.themeText}>{t}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={s.divider} />
-
-          {/* Hint */}
-          {hintShown ? (
-            <View style={s.hintCard}>
-              <Text style={s.hintHeader}>💡 HINT</Text>
-              <Text style={s.hintText}>{PUZZLE.hint}</Text>
-            </View>
-          ) : (
+        {/* Failed request or invalid response, with a retry button. */}
+        {!isLoading && isError && (
+          <View style={s.statusCard}>
+            <Text style={s.statusTitle}>
+              {invalidResponse
+                ? 'Invalid puzzle data'
+                : 'Unable to load puzzles'}
+            </Text>
+            <Text style={s.statusMessage}>
+              {error?.message ??
+                'Puzzles could not be loaded. Please try again.'}
+            </Text>
             <Pressable
-              onPress={() => setHintShown(true)}
-              style={({ pressed }) => [s.hintBtn, pressed && { opacity: 0.7 }]}
+              accessibilityRole="button"
+              onPress={() => void handleRefetch()}
+              disabled={isRefetching}
+              style={({ pressed }) => [
+                s.statusButton,
+                (pressed || isRefetching) && s.buttonDimmed,
+              ]}
             >
-              <Text style={s.hintBtnText}>💡 Show Hint (−5 pts)</Text>
+              <Text style={s.statusButtonText}>
+                {isRefetching ? 'Retrying…' : 'Try Again'}
+              </Text>
             </Pressable>
-          )}
-        </View>
-
-        {/* ── Dev Simulate Row ───────────────────── */}
-        {state === 'solving' && (
-          <View style={s.devRow}>
-            <View style={s.devDivider}>
-              <View style={s.devLine} />
-              <Text style={s.devLabel}>DEV ONLY</Text>
-              <View style={s.devLine} />
-            </View>
-            <View style={s.devBtns}>
-              <Pressable
-                onPress={() => showResult('correct')}
-                style={({ pressed }) => [
-                  s.devBtn,
-                  s.devBtnCorrect,
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Text style={s.devBtnText}>✓ Correct</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => showResult('incorrect')}
-                style={({ pressed }) => [
-                  s.devBtn,
-                  s.devBtnWrong,
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Text style={[s.devBtnText, { color: palette.error }]}>
-                  ✗ Wrong
-                </Text>
-              </Pressable>
-            </View>
           </View>
         )}
 
-        <View style={{ height: 80 }} />
+        {/* A successful empty array gives no puzzle to show. */}
+        {!isLoading && !isError && !puzzle && (
+          <View style={s.statusCard}>
+            <Text style={s.statusTitle}>No puzzles available</Text>
+            <Text style={s.statusMessage}>
+              The server returned an empty puzzle list. Try requesting another
+              batch.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void handleRefetch()}
+              disabled={isRefetching}
+              style={({ pressed }) => [
+                s.statusButton,
+                (pressed || isRefetching) && s.buttonDimmed,
+              ]}
+            >
+              <Text style={s.statusButtonText}>
+                {isRefetching ? 'Loading…' : 'Load Puzzles'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* A loaded puzzle: read-only position preview and backend metadata. */}
+        {puzzle && (
+          <>
+            <View style={s.boardWrap}>
+              {/* The shared board reads the FEN; disabled prevents making moves. */}
+              <ChessBoard_component
+                key={`${puzzle.id}-${puzzle.fen}`}
+                fen={puzzle.fen}
+                orientation={boardOrientation}
+                disabled
+                showLegalMoves={false}
+                labels
+              />
+            </View>
+            <Text style={s.previewNote}>
+              Read-only starting position, before the opponent’s first move.
+            </Text>
+
+            {/* Display only fields actually available on the loaded puzzle. */}
+            <View style={s.infoCard}>
+              <View style={s.infoHeader}>
+                <Text style={s.infoTitle}>Puzzle information</Text>
+                <Text style={s.batchCount}>
+                  {activeIndex + 1} of {count}
+                </Text>
+              </View>
+
+              {/* Optional numbers are hidden when undefined. 0 still displays. */}
+              <DetailRow label="Puzzle ID" value={puzzle.id} />
+              {puzzle.rating !== undefined && (
+                <DetailRow label="Rating" value={puzzle.rating} />
+              )}
+              {puzzle.ratingDeviation !== undefined && (
+                <DetailRow
+                  label="Rating deviation"
+                  value={puzzle.ratingDeviation}
+                />
+              )}
+              {puzzle.popularity !== undefined && (
+                <DetailRow label="Popularity" value={puzzle.popularity} />
+              )}
+              {puzzle.plays !== undefined && (
+                <DetailRow label="Times played" value={puzzle.plays} />
+              )}
+
+              {/* Only add a divider if at least one tag section is visible. */}
+              {(puzzle.themes.length > 0 || puzzle.openingTags.length > 0) && (
+                <View style={s.divider} />
+              )}
+              <Tags title="Themes" values={puzzle.themes} />
+              <Tags title="Opening tags" values={puzzle.openingTags} />
+
+              <View style={s.divider} />
+              {/* FEN is the position string returned by the backend. */}
+              <Text style={s.sectionLabel}>Starting FEN</Text>
+              <Text selectable style={s.fenText}>
+                {puzzle.fen}
+              </Text>
+            </View>
+
+            {/* Fetch a new batch, even before reaching the last puzzle. */}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void handleRefetch()}
+              disabled={isRefetching}
+              style={({ pressed }) => [
+                s.refreshButton,
+                (pressed || isRefetching) && s.buttonDimmed,
+              ]}
+            >
+              <Text style={s.refreshButtonText}>
+                {isRefetching ? 'Loading new puzzles…' : 'Get New Batch'}
+              </Text>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
 
-      {/* ── Footer CTA ─────────────────────────── */}
-      <View style={s.footer}>
-        <Pressable
-          onPress={handleNew}
-          style={({ pressed }) => [s.ctaBtn, pressed && s.ctaBtnPressed]}
-        >
-          <Text style={s.ctaBtnText}>
-            {state === 'solving' ? 'Skip  ›' : 'Next Puzzle  ›'}
-          </Text>
-        </Pressable>
-      </View>
+      {/* Footer: advance within this batch or fetch more puzzles. */}
+      {puzzle && (
+        <View style={s.footer}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleNext}
+            disabled={isRefetching}
+            style={({ pressed }) => [
+              s.ctaBtn,
+              pressed && s.ctaBtnPressed,
+              isRefetching && s.buttonDimmed,
+            ]}
+          >
+            {isRefetching ? (
+              <ActivityIndicator color={palette.ink} />
+            ) : (
+              <Text style={s.ctaBtnText}>
+                {activeIndex < count - 1
+                  ? 'Next Puzzle  ›'
+                  : 'Get More Puzzles  ›'}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
-const b = StyleSheet.create({
-  board: { width: '100%', aspectRatio: 1, position: 'relative' },
-  row: { flex: 1, flexDirection: 'row' },
-  light: { flex: 1, backgroundColor: '#F0D9B5' },
-  dark: { flex: 1, backgroundColor: '#B58863' },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  overlayIcon: { fontSize: 72, opacity: 0.8 },
-  turnChip: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    right: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: radii.pill,
-    paddingVertical: 4,
-    paddingHorizontal: spacing.xs,
-  },
-  turnDot: {
-    width: 9,
-    height: 9,
-    borderRadius: radii.pill,
-    backgroundColor: palette.white,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.3)',
-  },
-  turnText: {
-    fontSize: 9,
-    fontWeight: fontWeights.bold,
-    color: palette.white,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-});
-
+// Shared shadow settings for cards and the board container.
 const SHADOW = {
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
@@ -326,17 +307,18 @@ const SHADOW = {
   elevation: 2,
 } as const;
 
+// Named styles used by the JSX above. Colors and spacing come from design tokens.
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.background },
 
-  /* Header */
+  // Header and screen title.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  headerSide: { flex: 1, minWidth: 0 },
   headerSup: {
     fontSize: 9,
     fontWeight: fontWeights.bold,
@@ -354,88 +336,27 @@ const s = StyleSheet.create({
     fontWeight: fontWeights.bold,
     color: palette.ink,
   },
-  streakChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxs,
-    backgroundColor: `${palette.accentYellow}33`,
-    borderWidth: 1,
-    borderColor: palette.accentYellow,
-    borderRadius: radii.pill,
-    paddingVertical: spacing.xxs,
-    paddingHorizontal: spacing.sm,
-  },
-  streakFire: { fontSize: 15 },
-  streakCount: {
-    fontSize: fontSizes.label,
-    fontWeight: fontWeights.bold,
-    color: palette.ink,
-  },
 
-  /* Board */
-  scroll: { paddingHorizontal: spacing.lg, gap: spacing.md },
+  // Scrollable content and read-only board preview.
+  scroll: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
   boardWrap: {
     borderRadius: radii.md,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: palette.border,
+    backgroundColor: palette.ink,
+    padding: spacing.xs,
     ...SHADOW,
   },
-
-  /* Result banner */
-  resultBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radii.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-  },
-  resultBannerCorrect: {
-    backgroundColor: `${palette.brandGreen}1A`,
-    borderColor: palette.brandGreen,
-  },
-  resultBannerWrong: {
-    backgroundColor: palette.errorBackground,
-    borderColor: palette.error,
-  },
-  resultIcon: { fontSize: 28 },
-  resultContent: { flex: 1, gap: 2 },
-  resultTitle: {
-    fontSize: fontSizes.label,
-    fontWeight: fontWeights.bold,
-    color: palette.ink,
-  },
-  resultSub: { fontSize: fontSizes.caption, color: palette.gray },
-
-  solutionToggle: { alignItems: 'center', paddingVertical: spacing.xs },
-  solutionToggleText: {
+  previewNote: {
     fontSize: fontSizes.caption,
-    fontWeight: fontWeights.semibold,
-    color: palette.brandGreen,
-  },
-  solutionCard: {
-    backgroundColor: `${palette.brandGreen}15`,
-    borderRadius: radii.md,
-    borderLeftWidth: 3,
-    borderLeftColor: palette.brandGreen,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  solutionHeader: {
-    fontSize: 9,
-    fontWeight: fontWeights.bold,
-    color: palette.brandGreen,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  solutionText: {
-    fontSize: fontSizes.label,
-    fontWeight: fontWeights.semibold,
-    color: palette.ink,
+    color: palette.muted,
+    textAlign: 'center',
   },
 
-  /* Info card */
+  // Puzzle metadata, tag pills, and FEN text.
   infoCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: radii.lg,
@@ -445,37 +366,43 @@ const s = StyleSheet.create({
     gap: spacing.md,
     ...SHADOW,
   },
-  infoTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  ratingBox: {
-    backgroundColor: theme.colors.background,
-    borderRadius: radii.md,
-    padding: spacing.md,
+  infoHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 70,
-    gap: 2,
-    borderWidth: 1,
-    borderColor: palette.border,
+    justifyContent: 'space-between',
   },
-  ratingLabel: {
-    fontSize: 9,
-    fontWeight: fontWeights.bold,
-    color: palette.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  ratingValue: {
-    fontSize: fontSizes.title,
-    fontWeight: fontWeights.bold,
-    color: palette.brandGreen,
-  },
-  desc: {
-    flex: 1,
+  infoTitle: {
     fontSize: fontSizes.label,
+    fontWeight: fontWeights.bold,
+    color: palette.ink,
+  },
+  batchCount: {
+    fontSize: fontSizes.caption,
+    color: palette.muted,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  detailLabel: {
+    fontSize: fontSizes.caption,
+    color: palette.muted,
+  },
+  detailValue: {
+    flexShrink: 1,
+    fontSize: fontSizes.caption,
     fontWeight: fontWeights.semibold,
     color: palette.ink,
-    lineHeight: 22,
+    textAlign: 'right',
   },
   divider: { height: 1, backgroundColor: palette.border },
+  sectionLabel: {
+    fontSize: fontSizes.caption,
+    fontWeight: fontWeights.bold,
+    color: palette.muted,
+  },
+  tagSection: { gap: spacing.xs },
   themes: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   themePill: {
     backgroundColor: `${palette.brandGreen}1A`,
@@ -490,71 +417,59 @@ const s = StyleSheet.create({
     fontWeight: fontWeights.bold,
     color: palette.brandGreen,
   },
-  hintCard: {
-    backgroundColor: `${palette.accentYellow}22`,
-    borderRadius: radii.md,
-    borderLeftWidth: 3,
-    borderLeftColor: palette.accentYellow,
-    padding: spacing.md,
-    gap: spacing.xs,
+  fenText: {
+    fontSize: fontSizes.caption,
+    color: palette.ink,
+    fontFamily: 'monospace',
   },
-  hintHeader: {
-    fontSize: 9,
+
+  // Loading, error, empty-result messages, and retry controls.
+  statusCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.xl,
+    gap: spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: palette.border,
+    ...SHADOW,
+  },
+  statusTitle: {
+    fontSize: fontSizes.heading,
     fontWeight: fontWeights.bold,
     color: palette.ink,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    textAlign: 'center',
   },
-  hintText: { fontSize: fontSizes.caption, color: palette.ink, lineHeight: 20 },
-  hintBtn: {
-    backgroundColor: `${palette.accentYellow}1A`,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: `${palette.accentYellow}80`,
-    paddingVertical: spacing.sm,
+  statusMessage: {
+    fontSize: fontSizes.caption,
+    color: palette.gray,
+    textAlign: 'center',
+  },
+  statusButton: {
+    backgroundColor: palette.brandGreen,
+    borderRadius: radii.pill,
+    minHeight: 44,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusButtonText: {
+    fontSize: fontSizes.label,
+    fontWeight: fontWeights.bold,
+    color: palette.ink,
+  },
+  refreshButton: {
+    paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  hintBtnText: {
+  refreshButtonText: {
     fontSize: fontSizes.label,
     fontWeight: fontWeights.semibold,
-    color: palette.ink,
+    color: palette.brandGreen,
   },
+  buttonDimmed: { opacity: 0.6 },
 
-  /* Dev section */
-  devRow: { gap: spacing.sm },
-  devDivider: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  devLine: { flex: 1, height: 1, backgroundColor: palette.border },
-  devLabel: {
-    fontSize: 9,
-    fontWeight: fontWeights.bold,
-    color: palette.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-  },
-  devBtns: { flexDirection: 'row', gap: spacing.sm },
-  devBtn: {
-    flex: 1,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderStyle: 'dashed',
-  },
-  devBtnCorrect: {
-    borderColor: palette.brandGreen,
-    backgroundColor: `${palette.brandGreen}10`,
-  },
-  devBtnWrong: {
-    borderColor: palette.error,
-    backgroundColor: palette.errorBackground,
-  },
-  devBtnText: {
-    fontSize: fontSizes.caption,
-    fontWeight: fontWeights.semibold,
-    color: palette.ink,
-  },
-
-  /* Footer */
+  // Bottom Next Puzzle / Get More Puzzles button.
   footer: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
