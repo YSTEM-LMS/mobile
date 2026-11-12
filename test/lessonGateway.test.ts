@@ -31,7 +31,7 @@ describe('Lesson Gateway', () => {
     );
   });
 
-  it('accepts and maps the verified response fields', async () => {
+  it('accepts and maps structured Goal response fields', async () => {
     await expect(
       createApiLessonGateway(createClient()).getLesson(request),
     ).resolves.toEqual({
@@ -47,6 +47,14 @@ describe('Lesson Gateway', () => {
       maxMoves: 10,
       moves: [{ from: 'e2', to: 'e4', piece: 'p' }],
     });
+  });
+
+  it('accepts goal in numeric form', async () => {
+    await expect(
+      createApiLessonGateway(
+        createClient({ ...sanitizedLessonResponseFixture, goal: 1 }),
+      ).getLesson(request),
+    ).resolves.toMatchObject({ goal: 1 });
   });
 
   it('has a functioning fake gateway without a server', async () => {
