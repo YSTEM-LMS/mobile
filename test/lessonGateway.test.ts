@@ -49,14 +49,6 @@ describe('Lesson Gateway', () => {
     });
   });
 
-  it('accepts goal in numeric form', async () => {
-    await expect(
-      createApiLessonGateway(
-        createClient({ ...sanitizedLessonResponseFixture, goal: 1 }),
-      ).getLesson(request),
-    ).resolves.toMatchObject({ goal: 1 });
-  });
-
   it('has a functioning fake gateway without a server', async () => {
     await expect(
       createFakeLessonGateway().getLesson(request),

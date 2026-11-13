@@ -46,10 +46,10 @@ seed and website lesson types:
 | `name`                | `string`                       | Present in the backend route fixture and website lesson data.                   |
 | `info`                | `string`                       | Present in the backend seed and website lesson data.                            |
 | `solution`            | `string \| null`               | Website scenarios include string and `null` values.                             |
-| `goal`                | `Goal \| number \| null`       | Website types define structured goals; the backend seed contains numeric goals. |
-| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union; production optionality is unconfirmed.            |
-| `maxMoves`            | `number \| null`               | Present in the backend seed; production optionality is unconfirmed.             |
-| `moves`               | `Move[] \| null`               | Typed from the website move shape; persisted item shape is unconfirmed.         |
+| `goal`                | `Goal \| null`       | Website types define structured goals. |
+| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union.            |
+| `maxMoves`            | `number \| null`               | Present in the backend seed.             |
+| `moves`               | `Move[] \| null`               | Typed from the website move shape.         |
 
 The response does not provide the request's `piece` or `lessonNum` since those are only used to locate the lesson. These
 values are not included in the mapped `Lesson` type.
@@ -92,10 +92,6 @@ response validation, request failures, and the fake gateway.
 
 ## Questions Requiring YSTEM Confirmation
 
-These questions should be addressed so we can produce a concrete lesson schema.
-
-- Does production `goal` use numeric values, structured goals, or both?
 - Are `solution`, `goal`, `opponentConstraints`, `maxMoves`, and `moves`
   optional or nullable in production data?
-- Does persisted `moves` use the website `Move` shape?
 - What is the ordering of lesson names? This is to make sure the website and backend assumes the same ordering format when requesting lessons, since the backend returns the lesson at `lessons[lessonNum - 1]`.

@@ -45,7 +45,7 @@ export type Lesson = {
   name: string;
   info: string;
   solution: string | null;
-  goal: Goal | number | null;
+  goal: Goal | null;
   opponentConstraints: OpponentConstraint[] | null;
   maxMoves: number | null;
   moves: Move[] | null;
