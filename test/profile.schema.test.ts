@@ -3,11 +3,11 @@ import { ProfileResponseSchema } from '../src/features/profile/api/profile.schem
 const student = {
   username: 'sample.student',
   role: 'student',
-  first_name: 'Sample',
-  last_name: 'Student',
+  firstName: 'Sample',
+  lastName: 'Student',
   email: 'sample.student@example.invalid',
   school: 'Sample High School',
-  grade_level: '10',
+  gradeLevel: '10',
 };
 
 describe('ProfileResponseSchema', () => {
