@@ -26,9 +26,10 @@ import {
 } from '@/design/tokens';
 
 /* Chess Game imports */
-import { useChessGame } from '@/components/chess/useChessGame';
 import { ChessBoard_component } from '@/components/chess/Chessboard-component';
-const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+import { ConnectionBanner } from '@/components/feedback/ConnectionBanner';
+import { InlineError } from '@/components/feedback/InlineError';
+import { useComputerGame } from '@/features/play/services/hooks/useComputerGame';
 
 /*INVALID FEN: "wrong fen lmao"; */
 
@@ -184,17 +185,17 @@ function GameOverModal({
 }
 
 export default function PlayGameRoute() {
-  const { color = 'white', difficulty = 'beginner' } = useLocalSearchParams<{
+  const { difficulty = 'beginner' } = useLocalSearchParams<{
     color: string;
     difficulty: string;
   }>();
   const [tutorOpen, setTutorOpen] = useState(true);
   const [gameResult, setGameResult] = useState<GameResult>(null);
-  const isPlayerTurn = true;
 
   const diffLabel = DIFFICULTY_LABEL[difficulty as string] ?? difficulty;
-
-  const { position, lastMove, handleMove } = useChessGame(STARTING_FEN);
+  const game = useComputerGame({ difficulty });
+  const isPlayerTurn =
+    game.phase !== 'engine-turn' && game.phase !== 'engine-failed';
 
   return (
     <SafeAreaView style={s.safe}>
@@ -224,6 +225,34 @@ export default function PlayGameRoute() {
         contentContainerStyle={s.scroll}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Game status ────────────────────────── */}
+        {game.phase === 'starting' && (
+          <ConnectionBanner message="Starting game…" status="connecting" />
+        )}
+
+        {(game.phase === 'start-failed' || game.phase === 'engine-failed') && (
+          <View style={s.errorWrap}>
+            <InlineError
+              title={
+                game.phase === 'start-failed'
+                  ? "Couldn't start the game"
+                  : "The computer couldn't move"
+              }
+              message={game.errorMessage ?? 'Something went wrong.'}
+            />
+            <Pressable
+              accessibilityLabel="Retry"
+              onPress={game.retry}
+              style={({ pressed }) => [
+                s.retryBtn,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Text style={s.retryText}>Retry</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* ── Opponent Row ───────────────────────── */}
         <PlayerRow
           label={`Computer (${(difficulty as string).charAt(0).toUpperCase() + (difficulty as string).slice(1)})`}
@@ -235,11 +264,11 @@ export default function PlayGameRoute() {
         {/* ── Board ──────────────────────────────── */}
         <View style={s.boardWrap}>
           <ChessBoard_component
-            fen={position}
-            orientation={color === 'white' ? 'white' : 'black'}
-            disabled={false}
-            onMove={handleMove}
-            lastMove={lastMove ?? undefined}
+            fen={game.position}
+            orientation="white"
+            disabled={game.inputDisabled}
+            onMove={game.makePlayerMove}
+            lastMove={game.lastMove ?? undefined}
             labels={true}
           />
         </View>
@@ -334,13 +363,19 @@ export default function PlayGameRoute() {
           {
             icon: '🤝',
             label: 'Draw',
-            onPress: () => setGameResult('draw'),
+            onPress: () => {
+              game.abandon();
+              setGameResult('draw');
+            },
             variant: 'normal' as const,
           },
           {
             icon: '🏳',
             label: 'Resign',
-            onPress: () => setGameResult('lose'),
+            onPress: () => {
+              game.abandon();
+              setGameResult('lose');
+            },
             variant: 'danger' as const,
           },
         ].map((item) => (
@@ -368,7 +403,7 @@ export default function PlayGameRoute() {
       </View>
 
       <GameOverModal
-        result={gameResult}
+        result={gameResult ?? game.outcome}
         onNewGame={() => {
           setGameResult(null);
           router.back();
@@ -571,6 +606,19 @@ const s = StyleSheet.create({
     borderRadius: radii.sm,
     overflow: 'hidden',
     backgroundColor: palette.ink,
+  },
+  errorWrap: { gap: spacing.sm },
+  retryBtn: {
+    backgroundColor: palette.brandGreen,
+    borderRadius: radii.pill,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryText: {
+    fontSize: fontSizes.label,
+    fontWeight: fontWeights.bold,
+    color: palette.ink,
   },
 
   /* Tutor */
