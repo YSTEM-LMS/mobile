@@ -40,16 +40,16 @@ sends `Authorization: Bearer <token>` when its token provider is configured.
 The following fields are supported by the mobile schema based on the backend
 seed and website lesson types:
 
-| Field                 | Mobile type                    | Evidence or limitation                                                          |
-| --------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
-| `startFen`            | `string`                       | Present in the backend seed and website lesson data.                            |
-| `name`                | `string`                       | Present in the backend route fixture and website lesson data.                   |
-| `info`                | `string`                       | Present in the backend seed and website lesson data.                            |
-| `solution`            | `string \| null`               | Website scenarios include string and `null` values.                             |
-| `goal`                | `Goal \| null`       | Website types define structured goals. |
-| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union.            |
-| `maxMoves`            | `number \| null`               | Present in the backend seed.             |
-| `moves`               | `Move[] \| null`               | Typed from the website move shape.         |
+| Field                 | Mobile type                    | Evidence or limitation                                        |
+| --------------------- | ------------------------------ | ------------------------------------------------------------- |
+| `startFen`            | `string`                       | Present in the backend seed and website lesson data.          |
+| `name`                | `string`                       | Present in the backend route fixture and website lesson data. |
+| `info`                | `string`                       | Present in the backend seed and website lesson data.          |
+| `solution`            | `string \| null`               | Website scenarios include string and `null` values.           |
+| `goal`                | `Goal \| null`                 | Website types define structured goals.                        |
+| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union.                                 |
+| `maxMoves`            | `number \| null`               | Present in the backend seed.                                  |
+| `moves`               | `Move[] \| null`               | Typed from the website move shape.                            |
 
 The response does not provide the request's `piece` or `lessonNum` since those are only used to locate the lesson. These
 values are not included in the mapped `Lesson` type.
@@ -89,9 +89,3 @@ does not establish the complete production response shape.
 
 The mobile gateway tests cover URL encoding, structured and numeric goals,
 response validation, request failures, and the fake gateway.
-
-## Questions Requiring YSTEM Confirmation
-
-- Are `solution`, `goal`, `opponentConstraints`, `maxMoves`, and `moves`
-  optional or nullable in production data?
-- What is the ordering of lesson names? This is to make sure the website and backend assumes the same ordering format when requesting lessons, since the backend returns the lesson at `lessons[lessonNum - 1]`.
