@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Screen } from '@/components/ui/Screen';
 import { Spinner } from '@/components/ui/Spinner';
@@ -12,12 +13,14 @@ import ErrorScreen from '@/features/auth/components/error-screen';
 
 export default function RootLayout() {
   return (
-    <QueryProvider>
-      <SessionProvider>
-        <RootNavigator />
-        <StatusBar style="dark" />
-      </SessionProvider>
-    </QueryProvider>
+    <GestureHandlerRootView>
+      <QueryProvider>
+        <SessionProvider>
+          <RootNavigator />
+          <StatusBar style="dark" />
+        </SessionProvider>
+      </QueryProvider>
+    </GestureHandlerRootView>
   );
 }
 
