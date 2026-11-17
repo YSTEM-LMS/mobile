@@ -1,10 +1,36 @@
-import { render, fireEvent } from '@testing-library/react-native';
+import { act, render, fireEvent } from '@testing-library/react-native';
 import { ChessBoard_component } from '@/components/chess/Chessboard-component';
 import { StyleSheet } from 'react-native';
+import {
+  Gesture,
+  type GestureStateChangeEvent,
+  type PanGesture,
+  type PanGestureHandlerEventPayload,
+} from 'react-native-gesture-handler';
 
 const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
 describe('ChessBoard_component', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  function gesturePoint(x: number, y: number) {
+    return { x, y } as GestureStateChangeEvent<PanGestureHandlerEventPayload>;
+  }
+
+  async function drop(
+    gesture: PanGesture,
+    from: [number, number],
+    to: [number, number],
+    success: boolean,
+  ) {
+    expect(gesture.config.enabled).toBe(true);
+    await act(async () => {
+      const start = gesturePoint(...from);
+      gesture.handlers.onBegin?.(start);
+      gesture.handlers.onStart?.(start);
+      gesture.handlers.onFinalize?.(gesturePoint(...to), success);
+    });
+  }
   test('Starting position renders correctly', () => {
     const { getByLabelText } = render(
       <ChessBoard_component fen={STARTING_FEN} />,
@@ -87,6 +113,64 @@ describe('ChessBoard_component', () => {
 
     expect(onMove).toHaveBeenCalledWith('e2', 'e4');
   });
+
+  test.each([
+    ['white', 180, 260, 180, 180],
+    ['black', 140, 60, 140, 140],
+  ] as const)(
+    'A legal drop on the %s board emits one move',
+    async (orientation, x, y, toX, toY) => {
+      const pan = jest.spyOn(Gesture, 'Pan');
+      const onMove = jest.fn();
+      const { getByTestId, getByLabelText } = render(
+        <ChessBoard_component
+          fen={STARTING_FEN}
+          orientation={orientation}
+          onMove={onMove}
+        />,
+      );
+      fireEvent(getByTestId('chessboard-grid'), 'layout', {
+        nativeEvent: { layout: { width: 320 } },
+      });
+      await drop(
+        pan.mock.results.at(-1)?.value as PanGesture,
+        [x, y],
+        [toX, toY],
+        true,
+      );
+      expect(onMove).toHaveBeenCalledTimes(1);
+      expect(onMove).toHaveBeenCalledWith('e2', 'e4');
+      expect(getByLabelText('White p on e2')).toBeTruthy();
+    },
+  );
+
+  test.each([
+    ['illegal', true, 180, 140],
+    ['off-board', true, 320, 180],
+    ['canceled', false, 180, 180],
+  ] as const)(
+    'An %s drop leaves the parent position intact',
+    async (_reason, success, x, y) => {
+      const pan = jest.spyOn(Gesture, 'Pan');
+      const onMove = jest.fn();
+      const { getByTestId, getByLabelText } = render(
+        <ChessBoard_component fen={STARTING_FEN} onMove={onMove} />,
+      );
+      fireEvent(getByTestId('chessboard-grid'), 'layout', {
+        nativeEvent: { layout: { width: 320 } },
+      });
+      await drop(
+        pan.mock.results.at(-1)?.value as PanGesture,
+        [180, 260],
+        [x, y],
+        success,
+      );
+      expect(onMove).not.toHaveBeenCalled();
+      expect(
+        StyleSheet.flatten(getByLabelText('White p on e2').props.style).opacity,
+      ).toBeUndefined();
+    },
+  );
 
   test('Disabled mode prevents moves', () => {
     const onMove = jest.fn();

@@ -1,7 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Chess, Square } from 'chess.js';
-import { fontSizes, fontWeights, radii, spacing } from '@/design/tokens';
+import { Chess, type PieceSymbol, type Square } from 'chess.js';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
+import { SvgXml } from 'react-native-svg';
+import { scheduleOnRN } from 'react-native-worklets';
+import { standardPieces } from '@/assets/chess-pieces/standard';
+import { fontWeights, radii, spacing } from '@/design/tokens';
 
 type ChessBoardProps = {
   fen: string;
@@ -18,12 +26,35 @@ type ChessBoardProps = {
 };
 
 type Piece = {
-  square: string;
-  type: string;
+  square: Square;
+  type: PieceSymbol;
   color: 'w' | 'b';
 };
 
-/*main chessboard function  */
+type DragContext = {
+  fen: string;
+  orientation: 'white' | 'black';
+  size: number;
+  enabled: boolean;
+};
+
+function squareAt(x: number, y: number, size: number, squares: Square[]) {
+  'worklet';
+  if (size <= 0 || x < 0 || y < 0 || x >= size || y >= size) return undefined;
+  const cell = size / 8;
+  return squares[Math.floor(y / cell) * 8 + Math.floor(x / cell)];
+}
+
+function legalMovesFrom(game: Chess | null, from: Square | null) {
+  if (!game || !from) return [];
+  return game.moves({ square: from, verbose: true }).map((move) => move.to);
+}
+
+function PieceArtwork({ piece }: { piece: Piece }) {
+  const key = (piece.color +
+    piece.type.toUpperCase()) as keyof typeof standardPieces;
+  return <SvgXml xml={standardPieces[key]} width="100%" height="100%" />;
+}
 export function ChessBoard_component({
   fen,
   orientation = 'white',
@@ -36,6 +67,22 @@ export function ChessBoard_component({
 }: ChessBoardProps) {
   const [internalSelectedSquare, setInternalSelectedSquare] =
     useState<Square | null>(null);
+  const [size, setSize] = useState(0);
+  const [drag, setDrag] = useState<{
+    from: Square;
+    context: DragContext;
+  } | null>(null);
+  const initialTouch = useSharedValue<{
+    from: Square;
+    context: DragContext;
+  } | null>(null);
+  const translation = useSharedValue({ x: 0, y: 0 });
+  const dragStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translation.get().x },
+      { translateY: translation.get().y },
+    ],
+  }));
 
   /*creates a new game based on the fen position given, no fen returns null, as the game progresses, fen also changes alongside it */
   const game = useMemo(() => {
@@ -70,28 +117,6 @@ export function ChessBoard_component({
     return pieces;
   }, [game]);
 
-  /*determines which square is currently selected, either from the prop or the internal state */
-  const activeSelectedSquare = selectedSquare ?? internalSelectedSquare;
-
-  /*determines which squares are legal destinations for the currently selected piece, 
-  if no game or no selected square, returns an empty array, 
-  otherwise it uses the chess.js library to get the legal moves for the selected square and maps them to their destination squares */
-  const legalDestinations = useMemo(() => {
-    if (!game || !activeSelectedSquare) {
-      return [];
-    }
-
-    try {
-      return game
-        .moves({
-          square: activeSelectedSquare,
-          verbose: true,
-        })
-        .map((move) => move.to);
-    } catch {
-      return [];
-    }
-  }, [game, activeSelectedSquare]);
   /*determines the order of the files and ranks based on the orientation prop, 
   if the orientation is white, the files are a-h and the ranks are 8-1, 
  if the orientation is black, the files are h-a and the ranks are 1-8 */
@@ -112,31 +137,97 @@ export function ChessBoard_component({
   const pieceAt = (square: string) =>
     board.find((piece) => piece.square === square);
 
-  /*makes board playable or read-only*/
-  const handleSquarePress = (square: Square) => {
-    if (disabled || !game) {
-      return;
-    }
-    const piece = pieceAt(square);
+  const enabled = !disabled && !!onMove;
+  const context = { fen, orientation, size, enabled };
+  const contextMatches = (previous: DragContext) =>
+    enabled &&
+    previous.fen === fen &&
+    previous.orientation === orientation &&
+    previous.size === size;
+  const visibleDrag = drag && contextMatches(drag.context) ? drag.from : null;
+  const activeSelectedSquare =
+    visibleDrag ?? selectedSquare ?? internalSelectedSquare;
+  const legalDestinations = useMemo(
+    () => legalMovesFrom(game, activeSelectedSquare),
+    [game, activeSelectedSquare],
+  );
 
-    // If a piece is already selected and this is a legal destination
-    if (activeSelectedSquare && legalDestinations.includes(square)) {
-      onMove?.(activeSelectedSquare, square);
-      setInternalSelectedSquare(null);
-      return;
-    }
-
-    // Select a piece
-    if (piece) {
-      // Only allow selecting the side whose turn it is
-      if (piece.color === game.turn()) {
-        setInternalSelectedSquare(square);
-        return;
-      }
-    }
-
-    // Clicking elsewhere clears selection
+  const submitMove = (from: Square, to: Square) => {
+    if (disabled || !legalMovesFrom(game, from).includes(to)) return false;
+    onMove?.(from, to);
     setInternalSelectedSquare(null);
+    return true;
+  };
+
+  // Gesture callbacks can arrive after the parent has updated the board.
+  const latest = useRef({ contextMatches, submitMove });
+  useLayoutEffect(() => {
+    latest.current = { contextMatches, submitMove };
+  });
+
+  const startDrag = useCallback((from: Square, startedOn: DragContext) => {
+    if (latest.current.contextMatches(startedOn))
+      setDrag({ from, context: startedOn });
+  }, []);
+
+  const finishDrag = useCallback(
+    (from: Square, startedOn: DragContext, to: Square | undefined) => {
+      setDrag(null);
+      if (to && latest.current.contextMatches(startedOn))
+        latest.current.submitMove(from, to);
+    },
+    [],
+  );
+
+  const movableSquares = board
+    .filter((piece) => piece.color === game?.turn())
+    .map((piece) => piece.square);
+  const pan = Gesture.Pan()
+    .withTestId('chessboard-drag')
+    .enabled(enabled && !!game && size > 0)
+    .activateAfterLongPress(120)
+    .maxPointers(1)
+    .onTouchesDown(({ changedTouches }, manager) => {
+      const touch = changedTouches[0];
+      const from = touch && squareAt(touch.x, touch.y, size, squares);
+      if (!from || !movableSquares.includes(from)) manager.fail();
+    })
+    .onBegin(({ x, y }) => {
+      const from = squareAt(x, y, size, squares);
+      initialTouch.set(
+        from && movableSquares.includes(from) ? { from, context } : null,
+      );
+      translation.set({ x: 0, y: 0 });
+    })
+    // The native gesture runs this callback later and schedules the ref read on the JS thread.
+    // eslint-disable-next-line react-hooks/refs
+    .onStart(() => {
+      const touch = initialTouch.get();
+      if (touch) scheduleOnRN(startDrag, touch.from, touch.context);
+    })
+    .onUpdate(({ translationX, translationY }) => {
+      translation.set({ x: translationX, y: translationY });
+    })
+    // eslint-disable-next-line react-hooks/refs
+    .onFinalize(({ x, y }, success) => {
+      const touch = initialTouch.get();
+      initialTouch.set(null);
+      if (touch) {
+        const to = success ? squareAt(x, y, size, squares) : undefined;
+        scheduleOnRN(finishDrag, touch.from, touch.context, to);
+      }
+    });
+
+  const draggedPiece = visibleDrag ? pieceAt(visibleDrag) : undefined;
+  const draggedIndex = visibleDrag ? squares.indexOf(visibleDrag) : -1;
+
+  const handleSquarePress = (square: Square) => {
+    if (disabled || !game || visibleDrag) return;
+    if (activeSelectedSquare && submitMove(activeSelectedSquare, square))
+      return;
+    setInternalSelectedSquare(
+      pieceAt(square)?.color === game.turn() ? square : null,
+    );
   };
 
   /*visable error when catching invalid fen */
@@ -164,60 +255,84 @@ export function ChessBoard_component({
       )}
       {/* Actual board */}
       <View style={styles.boardContainer}>
-        <View style={styles.board}>
-          {squares.map((square, index) => {
-            const row = Math.floor(index / 8);
-            const column = index % 8;
+        <GestureDetector gesture={pan}>
+          <View
+            testID="chessboard-grid"
+            onLayout={({ nativeEvent }) => setSize(nativeEvent.layout.width)}
+            style={styles.board}
+          >
+            {squares.map((square, index) => {
+              const row = Math.floor(index / 8);
+              const column = index % 8;
 
-            const isDark = (row + column) % 2 === 1;
+              const isDark = (row + column) % 2 === 1;
 
-            const piece = pieceAt(square);
+              const piece = pieceAt(square);
 
-            const isSelected = activeSelectedSquare === square;
+              const isSelected = activeSelectedSquare === square;
 
-            const isLegalDestination =
-              showLegalMoves && legalDestinations.includes(square);
+              const isLegalDestination =
+                showLegalMoves && legalDestinations.includes(square);
 
-            const isLastMove =
-              lastMove?.from === square || lastMove?.to === square;
+              const isLastMove =
+                lastMove?.from === square || lastMove?.to === square;
 
-            return (
-              <Pressable
-                key={square}
-                onPress={() => handleSquarePress(square)}
-                accessibilityLabel={`Chess square ${square}`}
+              return (
+                <Pressable
+                  key={square}
+                  onPress={() => handleSquarePress(square)}
+                  accessibilityLabel={`Chess square ${square}`}
+                  style={[
+                    styles.square,
+                    isDark ? styles.darkSquare : styles.lightSquare,
+                    isSelected && styles.selectedSquare,
+                    isLastMove && styles.lastMoveSquare,
+                  ]}
+                >
+                  {piece && (
+                    <View
+                      accessible
+                      accessibilityRole="image"
+                      pointerEvents="none"
+                      style={[
+                        styles.piece,
+                        visibleDrag === square && styles.hiddenPiece,
+                      ]}
+                      accessibilityLabel={`${piece.color === 'w' ? 'White' : 'Black'} ${piece.type} on ${square}`}
+                    >
+                      <PieceArtwork piece={piece} />
+                    </View>
+                  )}
+
+                  {isLegalDestination && (
+                    <View
+                      pointerEvents="none"
+                      testID={`legal-move-${square}`}
+                      style={styles.legalMoveDot}
+                    />
+                  )}
+                </Pressable>
+              );
+            })}
+            {draggedPiece && (
+              <Animated.View
+                pointerEvents="none"
+                importantForAccessibility="no-hide-descendants"
+                accessibilityElementsHidden
                 style={[
-                  styles.square,
-                  isDark ? styles.darkSquare : styles.lightSquare,
-                  isSelected && styles.selectedSquare,
-                  isLastMove && styles.lastMoveSquare,
+                  styles.draggedPiece,
+                  {
+                    left: (draggedIndex % 8) * (size / 8),
+                    top: Math.floor(draggedIndex / 8) * (size / 8),
+                  },
+                  dragStyle,
                 ]}
               >
-                {piece && (
-                  <Text
-                    style={[
-                      styles.piece,
-                      piece.color === 'b'
-                        ? styles.blackPiece
-                        : styles.whitePiece,
-                    ]}
-                    accessibilityLabel={`${piece.color === 'w' ? 'White' : 'Black'} ${piece.type} on ${square}`}
-                  >
-                    {getPieceSymbol(piece.color, piece.type)}
-                  </Text>
-                )}
-
-                {isLegalDestination && (
-                  <View
-                    pointerEvents="none"
-                    testID={`legal-move-${square}`}
-                    style={styles.legalMoveDot}
-                  />
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
+                <PieceArtwork piece={draggedPiece} />
+              </Animated.View>
+            )}
+          </View>
+        </GestureDetector>
         {/* File labels */}
 
         {labels && (
@@ -232,29 +347,6 @@ export function ChessBoard_component({
       </View>
     </View>
   );
-}
-
-function getPieceSymbol(color: 'w' | 'b', type: string) {
-  const pieces = {
-    w: {
-      k: '♔',
-      q: '♕',
-      r: '♖',
-      b: '♗',
-      n: '♘',
-      p: '♙',
-    },
-    b: {
-      k: '♚',
-      q: '♛',
-      r: '♜',
-      b: '♝',
-      n: '♞',
-      p: '♟',
-    },
-  };
-
-  return pieces[color][type as keyof typeof pieces.w];
 }
 
 const styles = StyleSheet.create({
@@ -314,16 +406,19 @@ const styles = StyleSheet.create({
   },
 
   piece: {
-    fontSize: fontSizes.display,
-    lineHeight: 48,
+    width: '100%',
+    height: '100%',
   },
 
-  whitePiece: {
-    color: '#FFFFFF',
+  hiddenPiece: {
+    opacity: 0,
   },
 
-  blackPiece: {
-    color: '#000000',
+  draggedPiece: {
+    position: 'absolute',
+    width: '12.5%',
+    height: '12.5%',
+    zIndex: 1,
   },
 
   legalMoveDot: {
