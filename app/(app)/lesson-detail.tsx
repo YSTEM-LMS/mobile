@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ChessBoard_component } from '@/components/chess/Chessboard-component';
 import { InlineError } from '@/components/feedback/InlineError';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
@@ -137,60 +138,6 @@ const DEFAULT_STEPS: Step[] = [
     piece: '♟',
   },
 ];
-
-function ChessBoard({
-  highlight,
-  piece,
-}: {
-  highlight?: string;
-  piece?: string;
-}) {
-  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-  const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
-
-  return (
-    <View style={b.board}>
-      {/* Rank labels */}
-      <View style={b.labels}>
-        {ranks.map((r) => (
-          <Text key={r} style={b.rankLabel}>
-            {r}
-          </Text>
-        ))}
-      </View>
-      <View style={b.grid}>
-        {ranks.map((rank) => (
-          <View key={rank} style={b.row}>
-            {files.map((file, fi) => {
-              const sq = `${file}${rank}`;
-              const isHl = sq === highlight;
-              return (
-                <View
-                  key={sq}
-                  style={[
-                    b.square,
-                    (fi + rank) % 2 === 0 ? b.light : b.dark,
-                    isHl && b.highlight,
-                  ]}
-                >
-                  {isHl && piece && <Text style={b.piece}>{piece}</Text>}
-                </View>
-              );
-            })}
-          </View>
-        ))}
-        {/* File labels row */}
-        <View style={b.fileRow}>
-          {files.map((f) => (
-            <Text key={f} style={b.fileLabel}>
-              {f}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-}
 
 export default function LessonDetailRoute() {
   const { piece, lessonNumber } = useLocalSearchParams<{
@@ -377,7 +324,9 @@ export default function LessonDetailRoute() {
       >
         {/* ── Board ──────────────────────────────── */}
         <View style={s.boardWrap}>
-          <ChessBoard highlight={current?.highlight} piece={current?.piece} />
+          <View style={s.boardWrap}>
+            <ChessBoard_component fen={lessonQuery.data.startFen} disabled />
+          </View>
         </View>
 
         {/* ── Content ────────────────────────────── */}
@@ -460,39 +409,6 @@ export default function LessonDetailRoute() {
     </SafeAreaView>
   );
 }
-
-const b = StyleSheet.create({
-  board: { flexDirection: 'row', flex: 1 },
-  labels: {
-    justifyContent: 'space-around',
-    paddingVertical: 1,
-    paddingRight: 4,
-    paddingBottom: 18,
-  },
-  rankLabel: {
-    fontSize: 9,
-    color: palette.muted,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    height: '12.5%' as any,
-    lineHeight: 0,
-  },
-  grid: { flex: 1 },
-  row: { flex: 1, flexDirection: 'row' },
-  square: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  light: { backgroundColor: '#F0D9B5' },
-  dark: { backgroundColor: '#B58863' },
-  highlight: { backgroundColor: 'rgba(127,204,38,0.55)' },
-  piece: { fontSize: 20 },
-  fileRow: { flexDirection: 'row', height: 16 },
-  fileLabel: {
-    flex: 1,
-    fontSize: 9,
-    color: palette.muted,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-});
 
 const SHADOW = {
   shadowColor: '#000',
