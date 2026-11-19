@@ -109,6 +109,10 @@ class ApiClient implements ApiClientInterface {
         signal: controller.signal,
       });
 
+      if (response.status === 304) {
+        return null;
+      }
+
       // Response failed
       if (!response.ok) {
         switch (response.status) {
