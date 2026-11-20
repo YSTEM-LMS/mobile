@@ -55,7 +55,11 @@ export interface PracticeMove {
 /** A move as it is sent to the server, with the promotion piece filled in. */
 export type SentPracticeMove = Required<PracticeMove>;
 
-export type PracticeGameOverReason = 'checkmate' | 'draw';
+/**
+ * `resign` comes from the server's `resign` event, which works in mentor
+ * games too. No current client sends it, but the screen should still show it.
+ */
+export type PracticeGameOverReason = 'checkmate' | 'draw' | 'resign';
 
 export type PracticeEvent =
   /**
@@ -65,7 +69,10 @@ export type PracticeEvent =
   | { type: 'board'; fen: string }
   /** The server refused this device's last move. The position is unchanged. */
   | { type: 'move-rejected'; message: string }
-  /** The game ended on the board. `winner` and `loser` are usernames. */
+  /**
+   * The game is decided. `winner` and `loser` are usernames, sent for
+   * checkmate and resignation, not for a draw.
+   */
   | {
       type: 'game-over';
       reason: PracticeGameOverReason;

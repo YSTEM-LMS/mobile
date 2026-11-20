@@ -4,11 +4,13 @@ How a signed-in student and their mentor play one practice game through the
 live chess server's `newgame` flow, and the `MentorPracticeClient` interface
 the practice screen uses.
 
-**Status:** the interface, the fake client, and the fixtures are ready. The
-real Socket.IO client is not implemented yet, so build and test the screen
-against `createFakeMentorPracticeClient()`.
+**Status:** the interface, the fake client, the fixtures, and the real
+Socket.IO client are ready. The real client passed a two-client run against
+the chess server running locally (see [Verification](#verification)); staging
+has not been tested yet. Before beta, see [Open items](#open-items).
 
-**Sources** (repository `YSTEM-LMS/react`, commit `cc637f91`):
+**Sources** (repository `YSTEM-LMS/react`, commit `702e729`, `main` on
+2026-11-18):
 
 - `chessServer/src/managers/EventHandlers.js`: socket event handlers
 - `chessServer/src/managers/GameManager.js`: games, pairing, and moves
@@ -17,11 +19,13 @@ against `createFakeMentorPracticeClient()`.
 The server locks `chess.js` 1.4.0, the same version the mobile app uses, so
 the fake client checks moves exactly as the server does.
 
-| File                                                     | Contents                               |
-| -------------------------------------------------------- | -------------------------------------- |
-| `src/features/play/services/MentorPracticeClient.ts`     | The interface, events, and error class |
-| `src/features/play/services/fakeMentorPracticeClient.ts` | Deterministic fake for screen tests    |
-| `src/features/play/services/mentorPracticeFixtures.ts`   | The worked example and test positions  |
+| File                                                       | Contents                               |
+| ---------------------------------------------------------- | -------------------------------------- |
+| `src/features/play/services/MentorPracticeClient.ts`       | The interface, events, and error class |
+| `src/features/play/services/mentorPracticeSocketClient.ts` | The real Socket.IO client              |
+| `src/features/play/services/fakeMentorPracticeClient.ts`   | Deterministic fake for screen tests    |
+| `src/features/play/services/mentorPracticeFixtures.ts`     | The worked example and test positions  |
+| `test/mentorPracticeLive.test.ts`                          | Opt-in run against a live chess server |
 
 ## Interface
 
@@ -38,7 +42,7 @@ type PracticeEvent =
   | { type: 'move-rejected'; message: string }
   | {
       type: 'game-over';
-      reason: 'checkmate' | 'draw';
+      reason: 'checkmate' | 'draw' | 'resign';
       winner?: string;
       loser?: string;
     }
@@ -76,7 +80,83 @@ The server leaves these to the client:
    device's own move back as a `board` event, so the board does not need to
    apply moves itself.
 
-Practice games are not saved: no results, ratings, or history.
+Practice games are not saved: no results, ratings, or history. The server
+reports results only for student-vs-student games (`emitGameOver` checks
+`game.isPvp`), and a disconnect in a practice game ends it without a result.
+
+## The real client
+
+```ts
+import { createMentorPracticeClient } from '@/features/play/services/mentorPracticeSocketClient';
+
+// One client per mounted screen.
+const [client] = useState(() => createMentorPracticeClient());
+const { state, isMyTurn, sendMove } = usePracticeGame(client, pair);
+```
+
+It connects to `EXPO_PUBLIC_CHESS_SOCKET_URL` (`env.chessSocketUrl`). The
+options `url`, `createSocket`, and `timeoutMs` (default 10 seconds) are for
+tests. Each `join()` opens its own WebSocket and connects only then. The
+client can join again after `leave()` or `ended`, so React's development
+remount works.
+
+| Server sends                         | The client                                           |
+| ------------------------------------ | ---------------------------------------------------- |
+| `boardstate` with `color` (join)     | Resolves `join()` with `{ fen, color }`              |
+| `boardstate` (after a move)          | Emits `board`                                        |
+| `error` (a move failed)              | Emits `move-rejected` with the server's message      |
+| `gameover`                           | Emits `game-over` (`winnerUsername` → `winner`, ...) |
+| `reset` (the partner left)           | Emits `ended` and closes the socket                  |
+| Connection lost                      | Emits `ended`                                        |
+| `gameerror`, connect error, no reply | `join()` rejects with `MentorPracticeClientError`    |
+
+- **Leaving.** `leave()` removes every listener and closes the socket. The
+  server's disconnect handler deletes the game and sends `reset` to the
+  partner, who gets `ended`. The client's own disconnect is not reported as
+  `ended`.
+- **No reconnection.** The server deletes the game when the socket drops, so
+  the client does not reconnect. The screen shows the ended state instead.
+- **Untrusted payloads.** Every payload is checked (valid FEN, known color and
+  reason). A bad join reply rejects `join()`; a bad payload during a game emits
+  `ended`, because the board can no longer be trusted.
+- **Resignation.** The server's `resign` event works in practice games and
+  sends `gameover` with `reason: 'resign'`. No current client sends it, but the
+  screen should handle it like a checkmate.
+
+## Verification
+
+**Local, 2026-11-20.** The chess server from `react` `main` at `702e729`
+(Node 24, `NODE_ENV=development`, no middleware) ran on `localhost`, and
+`test/mentorPracticeLive.test.ts` played the worked example with two real
+clients:
+
+1. The mentor joined and got black at the start position.
+2. The student joined the same pair and got white.
+3. The student sent e2→e5; only the student got `move-rejected` with
+   `Invalid move: {"from":"e2","to":"e5"}`.
+4. The student sent e2→e4 (with `promotion: 'q'`); both clients got the same
+   `board` event with the position after 1. e4.
+5. The mentor left; the student got `ended`.
+
+The server log matched each step. `newgame` checks no login, so the run used
+generated usernames, not demo accounts.
+
+**Staging:** not tested yet. To run the same check against any server:
+
+```sh
+MENTOR_PRACTICE_LIVE_URL=https://<chess-server> npx jest test/mentorPracticeLive.test.ts
+```
+
+The test is skipped when the variable is not set, so CI does not need a
+server.
+
+## Open items
+
+| Item          | Owner                   | Detail                                                                                                                                                                                                                                                                             |
+| ------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authorization | YSTEM chess server team | `newgame` checks no identity: anyone who knows the two usernames can take a seat. Puzzle joins already verify the mentor through the middleware (`verifyMentorPairing`) and PvP joins through `/challenge/game/:id`; `newgame` needs the same before beta users get the real flow. |
+| Promotion     | Chess server (Brandon)  | `makeMove` passes only `from` and `to` to chess.js, so promotions are rejected. Fix: read `promotion` in the `move` handler and pass it to `makeMove`.                                                                                                                             |
+| Staging run   | Umar                    | Confirm the environment and accounts, then run the live test above.                                                                                                                                                                                                                |
 
 ## Worked example
 
