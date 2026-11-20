@@ -11,6 +11,7 @@ import {
   type PracticeJoinResult,
   type PracticeMove,
   type PracticePair,
+  type SentPracticeMove,
 } from './MentorPracticeClient';
 
 /**
@@ -31,6 +32,13 @@ export type FakeMentorPracticeClientOptions = {
 
   /** Simulated join time in milliseconds. leave() rejects a pending join. */
   joinDelayMs?: number;
+
+  /**
+   * Whether the fake server applies the promotion piece. Defaults to false,
+   * like the current chess server, which drops it and rejects promotions.
+   * Set it to true to test the screen against a server that passes it on.
+   */
+  serverAppliesPromotion?: boolean;
 };
 
 /**
@@ -59,8 +67,11 @@ export interface FakeMentorPracticeClient extends MentorPracticeClient {
   readonly pair: PracticePair | null;
   /** join() calls that passed validation. */
   readonly joinCalls: number;
-  /** Every move sendMove() sent, accepted or not, in order. */
-  readonly sentMoves: readonly PracticeMove[];
+  /**
+   * Every move sendMove() sent, accepted or not, in order, as it went over
+   * the socket (with the promotion piece filled in).
+   */
+  readonly sentMoves: readonly SentPracticeMove[];
   readonly leaveCalls: number;
   readonly listenerCount: number;
 }
@@ -71,8 +82,8 @@ export interface FakeMentorPracticeClient extends MentorPracticeClient {
  * It behaves like the real chess server: moves are checked with chess.js
  * (the server's version) and sent back as `board` events to this device too;
  * the server does not check which device's turn it is; promotions are
- * rejected; checkmate and draws emit `game-over`; and nothing resumes after
- * `ended`.
+ * rejected unless `serverAppliesPromotion` is set; checkmate and draws emit
+ * `game-over`; and nothing resumes after `ended`.
  *
  * Events arrive asynchronously, like network replies. In React tests, wrap
  * calls that trigger events in `await act(async () => { ... })`.
@@ -88,13 +99,14 @@ export function createFakeMentorPracticeClient(
     startingFen = DEFAULT_POSITION,
     joinError,
     joinDelayMs = 0,
+    serverAppliesPromotion = false,
   } = options;
 
   // Fail fast on a bad option instead of on the first join().
   new Chess(startingFen);
 
   const listeners = new Set<PracticeEventListener>();
-  const sentMoves: PracticeMove[] = [];
+  const sentMoves: SentPracticeMove[] = [];
   let board = new Chess(startingFen);
   let status: FakePracticeStatus = 'idle';
   let pair: PracticePair | null = null;
@@ -136,6 +148,14 @@ export function createFakeMentorPracticeClient(
       );
     }
     return pair;
+  }
+
+  /**
+   * Plays a move on the server's board. Throws, like chess.js, if it is
+   * illegal. The current server passes only from and to to chess.js.
+   */
+  function applyMove({ from, to, promotion }: SentPracticeMove): void {
+    board.move(serverAppliesPromotion ? { from, to, promotion } : { from, to });
   }
 
   /** The events the server sends after a move it accepted. */
@@ -209,8 +229,7 @@ export function createFakeMentorPracticeClient(
     sentMoves.push(validated);
 
     try {
-      // Like the server: only from and to reach chess.js.
-      board.move({ from: validated.from, to: validated.to });
+      applyMove(validated);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       deliver([{ type: 'move-rejected', message }]);
@@ -224,7 +243,7 @@ export function createFakeMentorPracticeClient(
     const current = requireGame('play a partner move');
 
     try {
-      board.move({ from: validated.from, to: validated.to });
+      applyMove(validated);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       throw new MentorPracticeClientError(

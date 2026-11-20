@@ -28,7 +28,8 @@ const FEN_AFTER_E4 =
  *    first player black, whatever their role.
  * 2. The student joins the same pair and gets white. Only the joining device
  *    receives a join reply; the mentor is not told the student arrived.
- * 3. The student plays e2e4.
+ * 3. The student plays e2e4. The client sends a queen promotion with every
+ *    move; chess.js ignores it here because e2e4 does not promote.
  * 4. The server sends the new position to both devices, including the
  *    student who made the move. Updates after a move carry no color.
  */
@@ -73,7 +74,10 @@ export const mentorPracticeWorkedExample = {
   },
   studentMove: {
     move: { from: 'e2', to: 'e4' } satisfies PracticeMove,
-    emitted: { event: 'move', payload: { from: 'e2', to: 'e4' } },
+    emitted: {
+      event: 'move',
+      payload: { from: 'e2', to: 'e4', promotion: 'q' },
+    },
     /** Sent to both devices. */
     serverReply: { event: 'boardstate', payload: { boardState: FEN_AFTER_E4 } },
     /** What both devices' listeners receive. */
@@ -100,12 +104,15 @@ export const practicePositions = {
     fenAfter: 'k7/2Q5/1K6/8/8/8/8/8 b - - 1 1',
   },
   /**
-   * White to move can promote, but the server drops the promotion piece, so
-   * chess.js rejects a7a8 with this exact message.
+   * White to move can promote. The client sends a7a8 with a queen, but the
+   * current server drops the piece, so chess.js rejects the move with
+   * `message`. A server that passes the piece on reaches `fenAfterQueen`
+   * (the fake client's `serverAppliesPromotion` option).
    */
   promotionRejected: {
     fen: '7k/P7/8/8/8/8/8/K7 w - - 0 1',
     move: { from: 'a7', to: 'a8' } satisfies PracticeMove,
     message: 'Invalid move: {"from":"a7","to":"a8"}',
+    fenAfterQueen: 'Q6k/8/8/8/8/8/8/K7 b - - 0 1',
   },
 } as const;

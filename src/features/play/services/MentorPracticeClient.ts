@@ -28,16 +28,32 @@ export interface PracticeJoinResult {
   color: PracticeColor;
 }
 
+/** The piece a pawn promotes to: queen, rook, bishop, or knight. */
+export type PracticePromotion = 'q' | 'r' | 'b' | 'n';
+
+/** The piece sent when a move does not name one. */
+export const DEFAULT_PRACTICE_PROMOTION: PracticePromotion = 'q';
+
 /**
- * A move as the server accepts it. There is no promotion field: the server
- * ignores one, so promoting moves are rejected.
+ * A move to send. Every move goes out with a promotion piece, queen unless
+ * another is given, like the website's client. chess.js ignores the piece
+ * on a move that does not promote, so the screen needs no promotion picker.
+ *
+ * The chess server currently drops the piece (its `makeMove` passes only
+ * `from` and `to` to chess.js), so promoting moves come back as
+ * `move-rejected` until the server passes it through.
  */
 export interface PracticeMove {
   /** Square the piece moves from, e.g. "e2". */
   from: string;
   /** Square the piece moves to, e.g. "e4". */
   to: string;
+  /** Defaults to queen. */
+  promotion?: PracticePromotion;
 }
+
+/** A move as it is sent to the server, with the promotion piece filled in. */
+export type SentPracticeMove = Required<PracticeMove>;
 
 export type PracticeGameOverReason = 'checkmate' | 'draw';
 
@@ -97,6 +113,7 @@ export class MentorPracticeClientError extends Error {
 }
 
 const SQUARE = /^[a-h][1-8]$/;
+const PROMOTIONS: readonly string[] = ['q', 'r', 'b', 'n'];
 
 /**
  * Checks a pair before anything is sent. TypeScript can be bypassed, so the
@@ -125,12 +142,22 @@ export function validatePracticePair(pair: PracticePair): PracticePair {
   return { student, mentor, role: pair.role };
 }
 
-/** Checks that both squares look like "e2" before a move is sent. */
-export function validatePracticeMove(move: PracticeMove): PracticeMove {
+/**
+ * Checks a move before it is sent: both squares must look like "e2" and the
+ * promotion piece, if given, must be q, r, b, or n. Returns the move as it
+ * goes over the socket, with the promotion piece defaulted to queen.
+ */
+export function validatePracticeMove(move: PracticeMove): SentPracticeMove {
   if (!SQUARE.test(move.from) || !SQUARE.test(move.to)) {
     throw new MentorPracticeClientError(
       `Invalid move squares: ${String(move.from)} to ${String(move.to)}.`,
     );
   }
-  return { from: move.from, to: move.to };
+  const promotion = move.promotion ?? DEFAULT_PRACTICE_PROMOTION;
+  if (!PROMOTIONS.includes(promotion)) {
+    throw new MentorPracticeClientError(
+      `Invalid promotion piece: ${String(promotion)}.`,
+    );
+  }
+  return { from: move.from, to: move.to, promotion };
 }

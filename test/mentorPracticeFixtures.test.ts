@@ -1,5 +1,6 @@
 import { Chess, DEFAULT_POSITION } from 'chess.js';
 
+import { validatePracticeMove } from '@/features/play/services/MentorPracticeClient';
 import {
   mentorPracticeWorkedExample,
   practicePositions,
@@ -31,7 +32,9 @@ describe('mentorPracticeWorkedExample', () => {
 
     expect(studentMove.serverReply.payload.boardState).toBe(board.fen());
     expect(studentMove.event).toEqual({ type: 'board', fen: board.fen() });
-    expect(studentMove.emitted.payload).toEqual(studentMove.move);
+    expect(studentMove.emitted.payload).toEqual(
+      validatePracticeMove(studentMove.move),
+    );
   });
 });
 
@@ -55,11 +58,13 @@ describe('practicePositions', () => {
   });
 
   it('promotionRejected fails without a promotion piece', () => {
-    const { fen, move, message } = practicePositions.promotionRejected;
+    const { fen, move, message, fenAfterQueen } =
+      practicePositions.promotionRejected;
 
     expect(() => new Chess(fen).move(move)).toThrow(message);
-    expect(() =>
-      new Chess(fen).move({ ...move, promotion: 'q' }),
-    ).not.toThrow();
+
+    const board = new Chess(fen);
+    board.move({ ...move, promotion: 'q' });
+    expect(board.fen()).toBe(fenAfterQueen);
   });
 });

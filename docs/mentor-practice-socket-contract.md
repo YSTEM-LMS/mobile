@@ -28,7 +28,7 @@ the fake client checks moves exactly as the server does.
 ```ts
 interface MentorPracticeClient {
   join(pair: PracticePair): Promise<PracticeJoinResult>; // { fen, color }
-  sendMove(move: PracticeMove): void; // { from, to }
+  sendMove(move: PracticeMove): void; // { from, to, promotion? }
   subscribe(listener: (event: PracticeEvent) => void): () => void;
   leave(): void;
 }
@@ -57,8 +57,14 @@ The server leaves these to the client:
    black, whatever their role. Never derive color from the role.
 2. **Only allow moves on this device's turn.** The server accepts a move from
    either device for whichever side is to move.
-3. **Disable promotion.** The server drops the promotion piece, so every
-   promoting move comes back as `move-rejected`.
+3. **Promotion is always to a queen; no picker is needed.** The client sends
+   `promotion: 'q'` with every move, like the website's client (chess.js
+   ignores it on a move that does not promote). Pass `promotion` only to
+   underpromote. **The server does not apply it yet:** `makeMove` in
+   `chessServer/src/managers/GameManager.js` passes only `from` and `to` to
+   chess.js (still true on `react` `main` at `702e729`), so promoting moves
+   come back as `move-rejected` until the server passes the piece through.
+   Show the rejection; do not block the move on the board.
 4. **Treat `ended` as final.** If either player leaves or disconnects, the
    server deletes the game for both. Nothing resumes; show a "session ended"
    state. A new `join()` starts a new game.
@@ -176,7 +182,7 @@ string on the wire.
 | ---- | ------- | -------------------------------------------------------------------- | ---------------------------------------------------------- |
 | 1    | Mentor  | `newgame` `{"student":"student","mentor":"mentor","role":"mentor"}`  | `boardstate` with the start position and `"color":"black"` |
 | 2    | Student | `newgame` `{"student":"student","mentor":"mentor","role":"student"}` | `boardstate` with the start position and `"color":"white"` |
-| 3    | Student | `move` `{"from":"e2","to":"e4"}`                                     | —                                                          |
+| 3    | Student | `move` `{"from":"e2","to":"e4","promotion":"q"}`                     | —                                                          |
 | 4    | Both    | —                                                                    | `boardstate` with the position after 1. e4, no color       |
 
 The mentor gets nothing at step 2. Step 4 reaches both devices as
@@ -218,6 +224,7 @@ triggers them in `await act(async () => { ... })`.
 | This device's color | `createFakeMentorPracticeClient({ color: 'black' })` (default `'white'`)           |
 | The partner moving  | `client.partnerMove({ from, to })`                                                 |
 | A rejected move     | `client.sendMove()` with an illegal move, or `practicePositions.promotionRejected` |
+| A fixed server      | `serverAppliesPromotion: true`; `promotionRejected` then reaches `fenAfterQueen`   |
 | Checkmate           | `startingFen: practicePositions.whiteMatesInOne.fen`, then play its `move`         |
 | A draw              | `startingFen: practicePositions.whiteStalematesInOne.fen`, then its `move`         |
 | A failed join       | `createFakeMentorPracticeClient({ joinError: new Error('...') })`                  |

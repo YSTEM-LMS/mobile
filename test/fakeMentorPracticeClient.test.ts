@@ -44,7 +44,7 @@ describe('createFakeMentorPracticeClient', () => {
     await flushEvents();
 
     expect(events).toEqual([studentMove.event]);
-    expect(client.sentMoves).toEqual([studentMove.move]);
+    expect(client.sentMoves).toEqual([studentMove.emitted.payload]);
   });
 
   it('plays the worked example from the mentor device', async () => {
@@ -183,10 +183,35 @@ describe('createFakeMentorPracticeClient', () => {
       },
     ]);
     expect(client.fen).toBe(DEFAULT_POSITION);
-    expect(client.sentMoves).toEqual([{ from: 'e2', to: 'e5' }]);
+    expect(client.sentMoves).toEqual([
+      { from: 'e2', to: 'e5', promotion: 'q' },
+    ]);
   });
 
-  it('rejects promotions, like the server', async () => {
+  it('sends a queen promotion with every move unless another is given', async () => {
+    const client = createFakeMentorPracticeClient();
+    await client.join(STUDENT);
+
+    client.sendMove({ from: 'e2', to: 'e4' });
+    client.sendMove({ from: 'e7', to: 'e5', promotion: 'n' });
+
+    expect(client.sentMoves).toEqual([
+      { from: 'e2', to: 'e4', promotion: 'q' },
+      { from: 'e7', to: 'e5', promotion: 'n' },
+    ]);
+  });
+
+  it('rejects an invalid promotion piece before sending', async () => {
+    const client = createFakeMentorPracticeClient();
+    await client.join(STUDENT);
+
+    expect(() =>
+      client.sendMove({ from: 'e2', to: 'e4', promotion: 'k' as 'q' }),
+    ).toThrow('Invalid promotion piece');
+    expect(client.sentMoves).toHaveLength(0);
+  });
+
+  it('rejects promotions, like the server, though the client sends a queen', async () => {
     const { fen, move, message } = practicePositions.promotionRejected;
     const client = createFakeMentorPracticeClient({ startingFen: fen });
     const { events } = recordEvents(client);
@@ -195,8 +220,41 @@ describe('createFakeMentorPracticeClient', () => {
     client.sendMove(move);
     await flushEvents();
 
+    expect(client.sentMoves).toEqual([{ ...move, promotion: 'q' }]);
     expect(events).toEqual([{ type: 'move-rejected', message }]);
     expect(client.fen).toBe(fen);
+  });
+
+  it('promotes when the server applies the promotion piece', async () => {
+    const { fen, move, fenAfterQueen } = practicePositions.promotionRejected;
+    const client = createFakeMentorPracticeClient({
+      startingFen: fen,
+      serverAppliesPromotion: true,
+    });
+    const { events } = recordEvents(client);
+    await client.join(STUDENT);
+
+    client.sendMove(move);
+    await flushEvents();
+
+    expect(events).toEqual([{ type: 'board', fen: fenAfterQueen }]);
+  });
+
+  it('applies the partner promotion the same way the server does', async () => {
+    const { fen, move, fenAfterQueen } = practicePositions.promotionRejected;
+    const current = createFakeMentorPracticeClient({ startingFen: fen });
+    await current.join(MENTOR);
+    expect(() => current.partnerMove(move)).toThrow(
+      'Partner move is not legal',
+    );
+
+    const fixed = createFakeMentorPracticeClient({
+      startingFen: fen,
+      serverAppliesPromotion: true,
+    });
+    await fixed.join(MENTOR);
+    fixed.partnerMove(move);
+    expect(fixed.fen).toBe(fenAfterQueen);
   });
 
   it('does not check whose turn it is, like the server', async () => {
