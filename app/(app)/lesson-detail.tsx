@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ChessBoard_component } from '@/components/chess/Chessboard-component';
+import { LessonExerciseBoard } from '@/features/lessons/exercise/LessonExerciseBoard';
 import { InlineError } from '@/components/feedback/InlineError';
 import { AppText } from '@/components/ui/AppText';
 import { Button } from '@/components/ui/Button';
@@ -323,11 +323,11 @@ export default function LessonDetailRoute() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Board ──────────────────────────────── */}
-        <View style={s.boardWrap}>
-          <View style={s.boardWrap}>
-            <ChessBoard_component fen={lessonQuery.data.startFen} disabled />
-          </View>
-        </View>
+        <LessonExerciseBoard
+          lesson={request}
+          startFen={lessonQuery.data.startFen}
+          solution={lessonQuery.data.solution}
+        />
 
         {/* ── Content ────────────────────────────── */}
         <Animated.View style={[s.panel, { opacity: fadeAnim }]}>
