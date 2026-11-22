@@ -313,7 +313,7 @@ export default function PlayGameRoute() {
           <InlineError
             title={'Session Ended'}
             message={
-              'The game abruptly ended, go back to the main screen to start a new one.'
+              "This practice session has ended. Go back to start a new game."
             }
           />
           <Button onPress={() => router.back()}>Go Back</Button>
