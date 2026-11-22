@@ -116,6 +116,18 @@ describe('API Client', () => {
     await expect(client.delete('/items/item-123')).resolves.toBeNull();
   });
 
+  it('returns null for a not-modified response', async () => {
+    const readResponseBody = jest.fn();
+    mockedFetch.mockResolvedValue({
+      ok: false,
+      status: 304,
+      text: readResponseBody,
+    } as unknown as Awaited<ReturnType<typeof fetch>>);
+
+    await expect(client.get('/items/item-123')).resolves.toBeNull();
+    expect(readResponseBody).not.toHaveBeenCalled();
+  });
+
   it('adds login token to Authorization header', async () => {
     const tokenProvider = jest.fn().mockResolvedValue('test-login-token');
 
