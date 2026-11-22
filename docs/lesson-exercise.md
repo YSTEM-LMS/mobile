@@ -62,6 +62,7 @@ last required move. `reset()` starts a new attempt, which may fire again. The
 backend write belongs to the progress adapter. The hook tracks `saveStatus` so
 a screen never shows an unsaved lesson as saved, and a late result from an old
 attempt or after unmount is ignored.
+
 ## Board component
 
 `LessonExerciseBoard` (`src/features/lessons/exercise/LessonExerciseBoard.tsx`)
@@ -75,12 +76,26 @@ supplies its own controller and the board is not changed. A lesson with no
 `solution` stays a read-only board. A solution that is present but unsupported
 shows an error and disables the board.
 
+## Saving progress
+
+Lesson Detail passes the progress adapter's `useSaveLessonCompletion().mutateAsync`
+as `onComplete`. It takes `{ piece, lessonNumber }` (one-based). The adapter
+converts the number for the backend, saves, reads the count back, and rejects
+if the server did not confirm it. The controller shows "Progress saved." only
+when the call resolves, and shows the error message when it rejects, so an
+unsaved lesson is never shown as saved. Finishing a new attempt after "Try
+again" calls it again, and the backend is responsible for not advancing the
+count twice. An expired session is handled by the adapter, which signs the
+student out.
+
 ## Dependencies
 
 - #15 (chessboard) and #41 (lesson data layer), both merged.
 - The numeric `goal` placeholder fix in the lesson schema and mapper.
-- Wiring into Lesson Detail needs the Learn/Lesson Detail PR, and saving needs
-  the progress adapter PR. Neither is required for this PR's tests.
+  Learn and Lesson Detail: branch `feat(lessons)/load-lessons`.
+- Lesson completion progress adapter: branch `feat/lesson-completion-progress`,
+  PR #<52>.
+- The controller's own tests do not need either of them.
 
 ## Verification
 
