@@ -6,8 +6,9 @@ the practice screen uses.
 
 **Status:** the interface, the fake client, the fixtures, and the real
 Socket.IO client are ready. The real client passed a two-client run against
-the chess server running locally (see [Verification](#verification)); staging
-has not been tested yet. Before beta, see [Open items](#open-items).
+the full backend running locally (see [Verification](#verification)). There
+is no staging server yet. Two issues on the chess server block beta use; see
+[Beta blockers](#beta-blockers).
 
 **Sources** (repository `YSTEM-LMS/react`, commit `702e729`, `main` on
 2026-11-18):
@@ -125,10 +126,15 @@ remount works.
 
 ## Verification
 
-**Local, 2026-11-20.** The chess server from `react` `main` at `702e729`
-(Node 24, `NODE_ENV=development`, no middleware) ran on `localhost`, and
-`test/mentorPracticeLive.test.ts` played the worked example with two real
-clients:
+There is no staging server yet, so the client is verified against the
+backend running locally.
+
+**Local, 2026-11-21.** MongoDB, the middleware, and the chess server from
+`react` `main` at `ef2c744a` (which includes `702e729`) ran on `localhost`
+through the repository's `docker-compose.yml`, with `NODE_ENV=development`.
+`npm run seed:dev` created the paired demo accounts `student` and `mentor`,
+and both signed in through `/auth/login`. `test/mentorPracticeLive.test.ts`
+then played the worked example with two real clients:
 
 1. The mentor joined and got black at the start position.
 2. The student joined the same pair and got white.
@@ -138,25 +144,50 @@ clients:
    `board` event with the position after 1. e4.
 5. The mentor left; the student got `ended`.
 
-The server log matched each step. `newgame` checks no login, so the run used
-generated usernames, not demo accounts.
+The chess server log matched each step. `newgame` checks no login, so the
+test uses generated usernames rather than the demo accounts.
 
-**Staging:** not tested yet. To run the same check against any server:
+To run the same check against a local or future staging server:
 
 ```sh
-MENTOR_PRACTICE_LIVE_URL=https://<chess-server> npx jest test/mentorPracticeLive.test.ts
+MENTOR_PRACTICE_LIVE_URL=http://localhost:3001 npx jest test/mentorPracticeLive.test.ts
 ```
 
 The test is skipped when the variable is not set, so CI does not need a
 server.
 
-## Open items
+**Local setup note.** Under Docker Desktop on Windows, the middleware can fail
+to start: in development it gives MongoDB only 1000 ms to connect
+(`serverSelectionTimeoutMS` in `middlewareNode/src/config/db.js`), and its
+in-memory fallback package is not in the Docker image. Raising that timeout
+locally fixes it.
 
-| Item          | Owner                   | Detail                                                                                                                                                                                                                                                                             |
-| ------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Authorization | YSTEM chess server team | `newgame` checks no identity: anyone who knows the two usernames can take a seat. Puzzle joins already verify the mentor through the middleware (`verifyMentorPairing`) and PvP joins through `/challenge/game/:id`; `newgame` needs the same before beta users get the real flow. |
-| Promotion     | Chess server (Brandon)  | `makeMove` passes only `from` and `to` to chess.js, so promotions are rejected. Fix: read `promotion` in the `move` handler and pass it to `makeMove`.                                                                                                                             |
-| Staging run   | Umar                    | Confirm the environment and accounts, then run the live test above.                                                                                                                                                                                                                |
+**Not yet verified on two devices.** The issue also asks for the demo student
+and mentor to play on two devices. That run is blocked by tooling, not by the
+client:
+
+- The project uses Expo SDK 57, and the current Expo Go from the app stores
+  runs only SDK 58. The Expo CLI can install a matching Expo Go on an Android
+  device or emulator, but an iPhone can get only the App Store version, so it
+  cannot open the app in Expo Go. Upgrading `expo` alone breaks the build and
+  tests; a full SDK 58 upgrade is separate work.
+- Two Android emulators alongside the local backend need more than 16 GB of
+  RAM.
+- Campus Wi-Fi such as eduroam blocks phones from reaching a laptop on the
+  same network. Use USB with `adb reverse` or a phone hotspot instead.
+
+Two Android devices over USB (or one device and one emulator on a machine
+with more RAM) can run it today.
+
+## Beta blockers
+
+Both are chess server issues. The client is complete for each; neither
+blocks local demo testing.
+
+| Blocker       | Owner                                     | Detail                                                                                                                                                                                                                                                                                       |
+| ------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authorization | Chess server team (owner being confirmed) | `newgame` checks no identity: anyone who knows the two usernames can take a seat. Puzzle joins already verify the mentor through the middleware (`verifyMentorPairing`) and PvP joins through `/challenge/game/:id`; `newgame` needs the same check before beta users get the real flow.     |
+| Promotion     | Chess server team                         | Known backend limitation. The client sends `promotion: 'q'` with every move, but `makeMove` passes only `from` and `to` to chess.js, so promoting moves are rejected as illegal. No server fix exists or is deployed. Fix: read `promotion` in the `move` handler and pass it to `makeMove`. |
 
 ## Worked example
 
