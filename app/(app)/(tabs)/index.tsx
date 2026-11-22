@@ -50,6 +50,14 @@ const QUICK_ACTIONS = [
     route: '/profile' as const,
     accent: '#9B59B6',
   },
+  {
+    id: 'student-mentor',
+    emoji: '🤝',
+    label: 'Practice',
+    sub: 'Mentor vs Student',
+    route: '/student-mentor' as const,
+    accent: palette.brandGreen,
+  },
 ];
 
 const ACTIVITY = [
