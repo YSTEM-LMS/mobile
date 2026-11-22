@@ -76,7 +76,8 @@ export const LessonResponseSchema = z.object({
   solution: z.string().nullish(),
   // Goals are optional structured rules in the website lesson model. The
   // numeric value in the backend seed is a placeholder, not a production form.
-  goal: goalSchema.nullish(),
+  // It is accepted here and mapped to null in lesson.mapper.ts.
+  goal: z.union([goalSchema, z.number()]).nullish(),
   opponentConstraints: z.array(opponentConstraintSchema).nullish(),
   maxMoves: z.number().int().nonnegative().nullish(),
   moves: z.array(moveSchema).nullish(),

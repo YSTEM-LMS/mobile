@@ -40,16 +40,16 @@ sends `Authorization: Bearer <token>` when its token provider is configured.
 The following fields are supported by the mobile schema based on the backend
 seed and website lesson types:
 
-| Field                 | Mobile type                    | Evidence or limitation                                        |
-| --------------------- | ------------------------------ | ------------------------------------------------------------- |
-| `startFen`            | `string`                       | Present in the backend seed and website lesson data.          |
-| `name`                | `string`                       | Present in the backend route fixture and website lesson data. |
-| `info`                | `string`                       | Present in the backend seed and website lesson data.          |
-| `solution`            | `string \| null`               | Website scenarios include string and `null` values.           |
-| `goal`                | `Goal \| null`                 | Website types define structured goals.                        |
-| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union.                                 |
-| `maxMoves`            | `number \| null`               | Present in the backend seed.                                  |
-| `moves`               | `Move[] \| null`               | Typed from the website move shape.                            |
+| Field                 | Mobile type                    | Evidence or limitation                                                                                                               |
+| --------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `startFen`            | `string`                       | Present in the backend seed and website lesson data.                                                                                 |
+| `name`                | `string`                       | Present in the backend route fixture and website lesson data.                                                                        |
+| `info`                | `string`                       | Present in the backend seed and website lesson data.                                                                                 |
+| `solution`            | `string \| null`               | Website scenarios include string and `null` values.                                                                                  |
+| `goal`                | `Goal \| null`                 | Structured goals per the website types. The backend seed sends a numeric placeholder (e.g. `1`), which the mapper turns into `null`. |     |
+| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union.                                                                                                        |
+| `maxMoves`            | `number \| null`               | Present in the backend seed.                                                                                                         |
+| `moves`               | `Move[] \| null`               | Typed from the website move shape.                                                                                                   |
 
 The response does not provide the request's `piece` or `lessonNum` since those are only used to locate the lesson. These
 values are not included in the mapped `Lesson` type.
