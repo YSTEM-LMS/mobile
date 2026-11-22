@@ -62,6 +62,18 @@ last required move. `reset()` starts a new attempt, which may fire again. The
 backend write belongs to the progress adapter. The hook tracks `saveStatus` so
 a screen never shows an unsaved lesson as saved, and a late result from an old
 attempt or after unmount is ignored.
+## Board component
+
+`LessonExerciseBoard` (`src/features/lessons/exercise/LessonExerciseBoard.tsx`)
+mounts the controller on the shared `ChessBoard_component`. It takes the same
+inputs as the hook (`lesson`, `startFen`, `solution`, optional `onComplete`) and
+renders the board, move feedback, the save status, and a "Try again" button.
+
+The computer game uses the same board with `useComputerGame`. The board only
+needs `fen`, `orientation`, `disabled`, `onMove` and `lastMove`, so each screen
+supplies its own controller and the board is not changed. A lesson with no
+`solution` stays a read-only board. A solution that is present but unsupported
+shows an error and disables the board.
 
 ## Dependencies
 
