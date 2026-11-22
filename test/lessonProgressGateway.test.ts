@@ -2,9 +2,7 @@ import { AppError } from '../src/services/api/apiError';
 import { createApiLessonProgressGateway } from '../src/features/lessons/api/ApiLessonProgressGateway';
 import type { ApiClientInterface } from '../src/types/apiClient.types';
 
-const createClient = (
-  response: unknown = 0,
-): ApiClientInterface => ({
+const createClient = (response: unknown = 0): ApiClientInterface => ({
   get: jest.fn().mockResolvedValue(response),
   post: jest.fn(),
   put: jest.fn(),
@@ -60,25 +58,23 @@ describe('Lesson progress gateway', () => {
   it('reads back the saved count and does not advance duplicate completions', async () => {
     let completedLessonCount = 0;
     const client = createClient();
-    (client.get as jest.Mock).mockImplementation(
-      async (endpoint: string) => {
-        const [path, query] = endpoint.split('?');
-        const params = new URLSearchParams(query);
+    (client.get as jest.Mock).mockImplementation(async (endpoint: string) => {
+      const [path, query] = endpoint.split('?');
+      const params = new URLSearchParams(query);
 
-        if (path === '/lessons/getCompletedLessonCount') {
-          return completedLessonCount;
+      if (path === '/lessons/getCompletedLessonCount') {
+        return completedLessonCount;
+      }
+      if (path === '/lessons/updateLessonCompletion') {
+        const nextCount = Number(params.get('lessonNum')) + 1;
+        if (nextCount > completedLessonCount) {
+          completedLessonCount = nextCount;
+          return 'Lesson progress updated';
         }
-        if (path === '/lessons/updateLessonCompletion') {
-          const nextCount = Number(params.get('lessonNum')) + 1;
-          if (nextCount > completedLessonCount) {
-            completedLessonCount = nextCount;
-            return 'Lesson progress updated';
-          }
-          return null;
-        }
-        throw new Error(`Unexpected lesson progress endpoint: ${path}`);
-      },
-    );
+        return null;
+      }
+      throw new Error(`Unexpected lesson progress endpoint: ${path}`);
+    });
 
     const gateway = createApiLessonProgressGateway(client);
     await expect(gateway.getCompletedLessonCount('pawn')).resolves.toBe(0);

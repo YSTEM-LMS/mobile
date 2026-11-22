@@ -24,7 +24,8 @@ jest.mock('@/features/lessons/api/lessonProgressGatewayProvider', () => ({
 const mockUseSession = useSession as jest.Mock;
 const mockExpiredSession = jest.fn();
 const mockGetCount = lessonProgressGateway.getCompletedLessonCount as jest.Mock;
-const mockSaveCompletion = lessonProgressGateway.saveLessonCompletion as jest.Mock;
+const mockSaveCompletion =
+  lessonProgressGateway.saveLessonCompletion as jest.Mock;
 
 const completion = { piece: 'pawn', lessonNumber: 1 };
 let queryClient: QueryClient;
@@ -63,7 +64,9 @@ describe('useSaveLessonCompletion', () => {
     const { result } = renderHook(() => useSaveLessonCompletion(), { wrapper });
 
     await act(async () => {
-      await expect(result.current.mutateAsync(completion)).rejects.toMatchObject({
+      await expect(
+        result.current.mutateAsync(completion),
+      ).rejects.toMatchObject({
         code: 'PERMISSION_DENIED',
       });
     });
@@ -106,9 +109,9 @@ describe('useSaveLessonCompletion', () => {
     const { result } = renderHook(() => useSaveLessonCompletion(), { wrapper });
 
     await act(async () => {
-      await expect(result.current.mutateAsync(completion)).rejects.toMatchObject(
-        { code: 'SESSION_EXPIRED' },
-      );
+      await expect(
+        result.current.mutateAsync(completion),
+      ).rejects.toMatchObject({ code: 'SESSION_EXPIRED' });
     });
 
     await waitFor(() => {

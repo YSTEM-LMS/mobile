@@ -49,10 +49,10 @@ export function createApiLessonProgressGateway(
         piece: piece.data,
         lessonNum: String(lessonNumber.data - 1),
       });
-      await client.get(
-        `/lessons/updateLessonCompletion?${query.toString()}`,
-        { responseType: 'text', signal: options?.signal },
-      );
+      await client.get(`/lessons/updateLessonCompletion?${query.toString()}`, {
+        responseType: 'text',
+        signal: options?.signal,
+      });
     },
   };
 }
