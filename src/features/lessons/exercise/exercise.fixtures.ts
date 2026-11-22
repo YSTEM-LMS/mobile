@@ -7,8 +7,9 @@ export const START_POSITION =
 export const BLACK_TO_MOVE =
   'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
 
-// TODO: replace with the topic name Brandon confirms for the demo seed.
-const DEMO_TOPIC = 'Demo topic';
+// Topic string from Learn. The demo records' info text mentions this topic.
+// Confirm it is the exact `piece` the backend matched.
+const DEMO_TOPIC = 'Knight - It moves in an L shape';
 
 export type ExerciseFixture = {
   lesson: LessonRequest;
