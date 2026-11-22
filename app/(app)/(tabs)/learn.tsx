@@ -36,6 +36,8 @@ type Piece = {
 
 type Lesson = {
   id: string;
+  topic: string;
+  lessonNumber: number;
   title: string;
   duration: string;
   status: LessonStatus;
@@ -55,6 +57,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
   pawn: [
     {
       id: 'p1',
+      topic: 'Pawn - It moves forward only',
+      lessonNumber: 1,
       title: "The Pawn's First Move",
       duration: '3 min',
       status: 'done',
@@ -62,6 +66,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'p2',
+      topic: 'Pawn - It moves forward only',
+      lessonNumber: 2,
       title: 'Pawn Captures',
       duration: '4 min',
       status: 'done',
@@ -69,6 +75,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'p3',
+      topic: 'Pawn - It moves forward only',
+      lessonNumber: 3,
       title: 'En Passant & Promotion',
       duration: '5 min',
       status: 'done',
@@ -78,6 +86,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
   knight: [
     {
       id: 'k1',
+      topic: 'Knight - It moves in an L shape',
+      lessonNumber: 1,
       title: 'The L-Shape Move',
       duration: '4 min',
       status: 'done',
@@ -85,6 +95,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'k2',
+      topic: 'Knight - It moves in an L shape',
+      lessonNumber: 2,
       title: 'Knight Forks',
       duration: '5 min',
       status: 'done',
@@ -92,6 +104,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'k3',
+      topic: 'Knight - It moves in an L shape',
+      lessonNumber: 3,
       title: 'Knight Outposts',
       duration: '6 min',
       status: 'available',
@@ -99,6 +113,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'k4',
+      topic: 'Knight - It moves in an L shape',
+      lessonNumber: 4,
       title: 'Knight vs Bishop',
       duration: '7 min',
       status: 'locked',
@@ -108,6 +124,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
   bishop: [
     {
       id: 'b1',
+      topic: 'Bishop - It moves diagonally',
+      lessonNumber: 1,
       title: 'Diagonal Power',
       duration: '3 min',
       status: 'available',
@@ -115,6 +133,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'b2',
+      topic: 'Bishop - It moves diagonally',
+      lessonNumber: 2,
       title: 'The Bishop Pair',
       duration: '5 min',
       status: 'locked',
@@ -122,6 +142,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'b3',
+      topic: 'Bishop - It moves diagonally',
+      lessonNumber: 3,
       title: 'Good vs Bad Bishop',
       duration: '6 min',
       status: 'locked',
@@ -131,6 +153,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
   rook: [
     {
       id: 'r1',
+      topic: 'Rook - It moves in straight lines',
+      lessonNumber: 1,
       title: 'Open File Strategy',
       duration: '4 min',
       status: 'available',
@@ -138,6 +162,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'r2',
+      topic: 'Rook - It moves in straight lines',
+      lessonNumber: 2,
       title: 'The Seventh Rank',
       duration: '5 min',
       status: 'locked',
@@ -145,6 +171,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'r3',
+      topic: 'Rook - It moves in straight lines',
+      lessonNumber: 3,
       title: 'Rook Endgames',
       duration: '8 min',
       status: 'locked',
@@ -154,6 +182,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
   queen: [
     {
       id: 'q1',
+      topic: 'Queen - Queen = Rook + Bishop',
+      lessonNumber: 1,
       title: 'The Most Powerful Piece',
       duration: '4 min',
       status: 'available',
@@ -161,6 +191,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'q2',
+      topic: 'Queen - Queen = Rook + Bishop',
+      lessonNumber: 2,
       title: 'Queen Attacks',
       duration: '5 min',
       status: 'locked',
@@ -168,6 +200,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'q3',
+      topic: 'Queen - Queen = Rook + Bishop',
+      lessonNumber: 3,
       title: 'Queen & Pawn Endgames',
       duration: '7 min',
       status: 'locked',
@@ -175,6 +209,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'q4',
+      topic: 'Queen - Queen = Rook + Bishop',
+      lessonNumber: 4,
       title: 'The Queen Sacrifice',
       duration: '6 min',
       status: 'locked',
@@ -184,6 +220,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
   king: [
     {
       id: 'kg1',
+      topic: 'King - The most important piece',
+      lessonNumber: 1,
       title: 'King Safety & Castling',
       duration: '5 min',
       status: 'available',
@@ -191,6 +229,8 @@ const LESSONS_BY_PIECE: Record<string, Lesson[]> = {
     },
     {
       id: 'kg2',
+      topic: 'King - The most important piece',
+      lessonNumber: 2,
       title: 'King in the Endgame',
       duration: '7 min',
       status: 'locked',
@@ -324,7 +364,10 @@ export default function LearnRoute() {
                 onPress={() =>
                   router.push({
                     pathname: '/lesson-detail',
-                    params: { id: lesson.id, piece: selectedPiece },
+                    params: {
+                      piece: lesson.topic,
+                      lessonNumber: String(lesson.lessonNumber),
+                    },
                   } as never)
                 }
                 style={({ pressed }) => [
@@ -385,7 +428,10 @@ export default function LearnRoute() {
               onPress={() =>
                 router.push({
                   pathname: '/lesson-detail',
-                  params: { id: nextLesson.id, piece: selectedPiece },
+                  params: {
+                    piece: nextLesson.topic,
+                    lessonNumber: String(nextLesson.lessonNumber),
+                  },
                 } as never)
               }
               style={({ pressed }) => [s.ctaBtn, pressed && s.ctaBtnPressed]}
