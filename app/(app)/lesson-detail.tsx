@@ -30,6 +30,7 @@ import {
   spacing,
 } from '@/design/tokens';
 import { useLesson } from '@/features/lessons/hooks/useLesson';
+import { useSaveLessonCompletion } from '@/features/lessons/hooks/useLessonProgress';
 
 type Step = {
   id: string;
@@ -154,6 +155,7 @@ export default function LessonDetailRoute() {
       ? { piece: rawPiece, lessonNumber: parsedLessonNumber }
       : null;
   const lessonQuery = useLesson(request);
+  const saveCompletion = useSaveLessonCompletion();
   const displayPiece = rawPiece ?? 'Lesson';
   const steps = STEPS_BY_PIECE[displayPiece] ?? DEFAULT_STEPS;
   const [step, setStep] = useState(0);
@@ -327,6 +329,7 @@ export default function LessonDetailRoute() {
           lesson={request}
           startFen={lessonQuery.data.startFen}
           solution={lessonQuery.data.solution}
+          onComplete={saveCompletion.mutateAsync}
         />
 
         {/* ── Content ────────────────────────────── */}
