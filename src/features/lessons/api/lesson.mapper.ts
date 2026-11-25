@@ -23,7 +23,7 @@ export function mapLesson(r: LessonResponse): Lesson {
     name: r.name,
     info: r.info,
     solution: r.solution ?? null,
-    goal: r.goal ?? null,
+    goal: typeof r.goal === 'number' ? null : (r.goal ?? null),
     opponentConstraints: r.opponentConstraints ?? null,
     maxMoves: r.maxMoves ?? null,
     moves: r.moves ?? null,

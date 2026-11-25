@@ -5,6 +5,7 @@
 
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { Chess } from 'chess.js';
 import {
   Animated,
   Pressable,
@@ -15,6 +16,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LessonExerciseBoard } from '@/features/lessons/exercise/LessonExerciseBoard';
+import { InlineError } from '@/components/feedback/InlineError';
+import { AppText } from '@/components/ui/AppText';
+import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 import { theme } from '@/design/theme';
 import {
   fontSizes,
@@ -23,6 +29,8 @@ import {
   radii,
   spacing,
 } from '@/design/tokens';
+import { useLesson } from '@/features/lessons/hooks/useLesson';
+import { useSaveLessonCompletion } from '@/features/lessons/hooks/useLessonProgress';
 
 type Step = {
   id: string;
@@ -132,66 +140,24 @@ const DEFAULT_STEPS: Step[] = [
   },
 ];
 
-function ChessBoard({
-  highlight,
-  piece,
-}: {
-  highlight?: string;
-  piece?: string;
-}) {
-  const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-  const ranks = [8, 7, 6, 5, 4, 3, 2, 1];
-
-  return (
-    <View style={b.board}>
-      {/* Rank labels */}
-      <View style={b.labels}>
-        {ranks.map((r) => (
-          <Text key={r} style={b.rankLabel}>
-            {r}
-          </Text>
-        ))}
-      </View>
-      <View style={b.grid}>
-        {ranks.map((rank) => (
-          <View key={rank} style={b.row}>
-            {files.map((file, fi) => {
-              const sq = `${file}${rank}`;
-              const isHl = sq === highlight;
-              return (
-                <View
-                  key={sq}
-                  style={[
-                    b.square,
-                    (fi + rank) % 2 === 0 ? b.light : b.dark,
-                    isHl && b.highlight,
-                  ]}
-                >
-                  {isHl && piece && <Text style={b.piece}>{piece}</Text>}
-                </View>
-              );
-            })}
-          </View>
-        ))}
-        {/* File labels row */}
-        <View style={b.fileRow}>
-          {files.map((f) => (
-            <Text key={f} style={b.fileLabel}>
-              {f}
-            </Text>
-          ))}
-        </View>
-      </View>
-    </View>
-  );
-}
-
 export default function LessonDetailRoute() {
-  const { piece = 'knight' } = useLocalSearchParams<{
-    piece: string;
-    id: string;
+  const { piece, lessonNumber } = useLocalSearchParams<{
+    piece?: string;
+    lessonNumber?: string;
   }>();
-  const steps = STEPS_BY_PIECE[piece as string] ?? DEFAULT_STEPS;
+  const rawPiece = Array.isArray(piece) ? piece[0] : piece;
+  const rawLessonNumber = Array.isArray(lessonNumber)
+    ? lessonNumber[0]
+    : lessonNumber;
+  const parsedLessonNumber = Number(rawLessonNumber);
+  const request =
+    rawPiece && Number.isInteger(parsedLessonNumber) && parsedLessonNumber > 0
+      ? { piece: rawPiece, lessonNumber: parsedLessonNumber }
+      : null;
+  const lessonQuery = useLesson(request);
+  const saveCompletion = useSaveLessonCompletion();
+  const displayPiece = rawPiece ?? 'Lesson';
+  const steps = STEPS_BY_PIECE[displayPiece] ?? DEFAULT_STEPS;
   const [step, setStep] = useState(0);
   const [completed, setCompleted] = useState(false);
 
@@ -200,6 +166,81 @@ export default function LessonDetailRoute() {
   const progress = (step + 1) / steps.length;
 
   const [fadeAnim] = useState(() => new Animated.Value(1));
+
+  if (!request) {
+    return (
+      <SafeAreaView style={s.stateSafe}>
+        <View style={s.stateContent}>
+          <InlineError
+            title="Lesson unavailable"
+            message="This lesson link is missing a valid topic or lesson number."
+          />
+          <Button variant="secondary" onPress={() => router.back()}>
+            Go back
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (lessonQuery.isPending) {
+    return (
+      <SafeAreaView style={s.stateSafe}>
+        <View style={[s.stateContent, s.loadingContent]}>
+          <Spinner label="Loading lesson" />
+          <AppText style={s.loadingText}>Loading lesson…</AppText>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (lessonQuery.isError || !lessonQuery.data) {
+    return (
+      <SafeAreaView style={s.stateSafe}>
+        <View style={s.stateContent}>
+          <InlineError
+            title="Unable to load lesson"
+            message={
+              lessonQuery.error?.message ??
+              'This lesson is unavailable right now.'
+            }
+          />
+          <View style={s.stateActions}>
+            <Button
+              loading={lessonQuery.isFetching}
+              onPress={() => void lessonQuery.refetch()}
+            >
+              Retry
+            </Button>
+            <Button variant="secondary" onPress={() => router.back()}>
+              Go back
+            </Button>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  try {
+    new Chess(lessonQuery.data?.startFen ?? '');
+  } catch {
+    return (
+      <SafeAreaView style={s.stateSafe}>
+        <View style={s.stateContent}>
+          <InlineError
+            title="Lesson data is invalid"
+            message="The lesson starting position could not be displayed."
+          />
+          <Button
+            loading={lessonQuery.isFetching}
+            onPress={() => void lessonQuery.refetch()}
+          >
+            Retry
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const navigate = (nextStep: number) => {
     Animated.sequence([
@@ -233,8 +274,9 @@ export default function LessonDetailRoute() {
     }
   };
 
-  const pieceName =
-    (piece as string).charAt(0).toUpperCase() + (piece as string).slice(1);
+  const pieceName = displayPiece
+    .split(' - ')[0]
+    .replace(/\b\w/g, (letter: string) => letter.toUpperCase());
 
   return (
     <SafeAreaView style={s.safe}>
@@ -251,7 +293,7 @@ export default function LessonDetailRoute() {
         <View style={s.topCenter}>
           <Text style={s.topSup}>{pieceName} Lesson</Text>
           <Text style={s.topTitle} numberOfLines={1}>
-            {current?.title}
+            {lessonQuery.data?.name ?? current?.title}
           </Text>
         </View>
         <View style={s.stepBadge}>
@@ -283,9 +325,12 @@ export default function LessonDetailRoute() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Board ──────────────────────────────── */}
-        <View style={s.boardWrap}>
-          <ChessBoard highlight={current?.highlight} piece={current?.piece} />
-        </View>
+        <LessonExerciseBoard
+          lesson={request}
+          startFen={lessonQuery.data.startFen}
+          solution={lessonQuery.data.solution}
+          onComplete={saveCompletion.mutateAsync}
+        />
 
         {/* ── Content ────────────────────────────── */}
         <Animated.View style={[s.panel, { opacity: fadeAnim }]}>
@@ -298,7 +343,9 @@ export default function LessonDetailRoute() {
                   <Text style={s.pieceBadgePillText}>Step {step + 1}</Text>
                 </View>
               </View>
-              <Text style={s.instruction}>{current?.instruction}</Text>
+              <Text style={s.instruction}>
+                {lessonQuery.data?.info ?? current?.instruction}
+              </Text>
               {current?.tip && (
                 <View style={s.tip}>
                   <Text style={s.tipHeader}>💡 TIP</Text>
@@ -366,39 +413,6 @@ export default function LessonDetailRoute() {
   );
 }
 
-const b = StyleSheet.create({
-  board: { flexDirection: 'row', flex: 1 },
-  labels: {
-    justifyContent: 'space-around',
-    paddingVertical: 1,
-    paddingRight: 4,
-    paddingBottom: 18,
-  },
-  rankLabel: {
-    fontSize: 9,
-    color: palette.muted,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-    height: '12.5%' as any,
-    lineHeight: 0,
-  },
-  grid: { flex: 1 },
-  row: { flex: 1, flexDirection: 'row' },
-  square: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  light: { backgroundColor: '#F0D9B5' },
-  dark: { backgroundColor: '#B58863' },
-  highlight: { backgroundColor: 'rgba(127,204,38,0.55)' },
-  piece: { fontSize: 20 },
-  fileRow: { flexDirection: 'row', height: 16 },
-  fileLabel: {
-    flex: 1,
-    fontSize: 9,
-    color: palette.muted,
-    fontWeight: fontWeights.bold,
-    textAlign: 'center',
-  },
-});
-
 const SHADOW = {
   shadowColor: '#000',
   shadowOffset: { width: 0, height: 2 },
@@ -409,6 +423,21 @@ const SHADOW = {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.background },
+  stateSafe: { flex: 1, backgroundColor: theme.colors.background },
+  stateContent: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  loadingContent: {
+    alignItems: 'center',
+  },
+  loadingText: {
+    textAlign: 'center',
+    width: '100%',
+  },
+  stateActions: { gap: spacing.sm },
 
   /* Top Bar */
   topBar: {

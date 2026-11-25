@@ -48,6 +48,38 @@ describe('Lesson Gateway', () => {
       moves: [{ from: 'e2', to: 'e4', piece: 'p' }],
     });
   });
+  it('maps the numeric goal placeholder from the demo seed to null', async () => {
+    const client = createClient({
+      startFen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+      name: 'Introduction',
+      info: "Welcome to the Knight - It moves in anL shape lesson! Let's get started.",
+      solution: 'e2e4',
+      goal: 1,
+      opponentConstraints: [],
+      maxMoves: 10,
+      moves: [],
+    });
+
+    await expect(
+      createApiLessonGateway(client).getLesson(request),
+    ).resolves.toMatchObject({
+      goal: null,
+      solution: 'e2e4',
+      opponentConstraints: [],
+      moves: [],
+    });
+  });
+
+  it('still rejects a goal that is neither structured nor numeric', async () => {
+    const client = createClient({
+      ...sanitizedLessonResponseFixture,
+      goal: 'CAPTURE',
+    });
+
+    await expect(
+      createApiLessonGateway(client).getLesson(request),
+    ).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
+  });
 
   it('has a functioning fake gateway without a server', async () => {
     await expect(
