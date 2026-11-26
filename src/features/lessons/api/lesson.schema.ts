@@ -55,16 +55,20 @@ export const LessonRequestSchema = z.object({
   lessonNumber: z.number().int().positive(),
 });
 
-export const LessonResponseSchema = z.object({
-  startFen: z.string().trim().min(1),
-  name: z.string().trim().min(1),
-  info: z.string(),
-  solution: z.string().nullish(),
-  // Goals are optional structured rules in the website lesson model. The
-  // numeric value in the backend seed is a placeholder, not a production form.
-  goal: goalSchema.nullish(),
-  opponentConstraints: z.array(opponentConstraintSchema).nullish(),
-  maxMoves: z.number().int().nonnegative().nullish(),
-});
+export const LessonResponseSchema = z
+  .object({
+    startFen: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    info: z.string(),
+    solution: z.string().nullable(),
+    // Goals are optional structured rules in the website lesson model.
+    goal: goalSchema.nullable(),
+    opponentConstraints: z.array(opponentConstraintSchema).optional(),
+    maxMoves: z.number().int().nonnegative().optional(),
+  })
+  .refine((lesson) => (lesson.solution !== null) !== (lesson.goal !== null), {
+    message: 'A lesson must have either a solution or a goal, but not both',
+    path: ['solution'],
+  });
 
 export type LessonResponse = z.infer<typeof LessonResponseSchema>;

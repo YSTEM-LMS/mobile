@@ -3,7 +3,7 @@ export const sanitizedLessonResponseFixture = {
   name: 'Sanitized lesson',
   info: 'Sanitized lesson instructions.',
   solution: 'e2e4',
-  goal: { type: 'CAPTURE', min: 1 },
+  goal: null,
   opponentConstraints: [
     { type: 'AVOID_CAPTURING' },
     { type: 'AVOID_SQUARES', squares: ['a1'] },
