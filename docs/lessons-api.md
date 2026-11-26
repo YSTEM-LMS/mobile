@@ -40,16 +40,15 @@ sends `Authorization: Bearer <token>` when its token provider is configured.
 The following fields are supported by the mobile schema based on the backend
 seed and website lesson types:
 
-| Field                 | Mobile type                    | Evidence or limitation                                                                                                               |
-| --------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `startFen`            | `string`                       | Present in the backend seed and website lesson data.                                                                                 |
-| `name`                | `string`                       | Present in the backend route fixture and website lesson data.                                                                        |
-| `info`                | `string`                       | Present in the backend seed and website lesson data.                                                                                 |
-| `solution`            | `string \| null`               | Website scenarios include string and `null` values.                                                                                  |
-| `goal`                | `Goal \| null`                 | Structured goals per the website types. The backend seed sends a numeric placeholder (e.g. `1`), which the mapper turns into `null`. |     |
-| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union.                                                                                                        |
-| `maxMoves`            | `number \| null`               | Present in the backend seed.                                                                                                         |
-| `moves`               | `Move[] \| null`               | Typed from the website move shape.                                                                                                   |
+| Field                 | Mobile type                    | Evidence or limitation                                                                                                                     |
+| --------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `startFen`            | `string`                       | Present in the backend seed and website lesson data.                                                                                       |
+| `name`                | `string`                       | Present in the backend route fixture and website lesson data.                                                                              |
+| `info`                | `string`                       | Present in the backend seed and website lesson data.                                                                                       |
+| `solution`            | `string \| null`               | Website scenarios include string and `null` values.                                                                                        |
+| `goal`                | `Goal \| null`                 | Structured goals per the website types. The local demo seed may send a numeric placeholder (e.g. `1`), which the mapper turns into `null`. |
+| `opponentConstraints` | `OpponentConstraint[] \| null` | Typed from the website union.                                                                                                              |
+| `maxMoves`            | `number \| null`               | Present in the backend seed.                                                                                                               |
 
 The response does not provide the request's `piece` or `lessonNum` since those are only used to locate the lesson. These
 values are not included in the mapped `Lesson` type.
@@ -86,7 +85,7 @@ in-memory MongoDB.
 
 The mobile gateway tests cover URL encoding, structured and numeric goals, response validation, request failures, and the fake gateway.
 
-NOTE: The moves field is empty. The numeric `"goal": 1` is treated as a placeholder and is mapped to null.
+NOTE: The local demo seed may return numeric `"goal": 1`; the mobile mapper treats it as a placeholder and maps it to `null`.
 
 ### Lesson 1
 
@@ -100,8 +99,7 @@ NOTE: The moves field is empty. The numeric `"goal": 1` is treated as a placehol
   "solution": "e2e4",
   "goal": 1,
   "opponentConstraints": [],
-  "maxMoves": 10,
-  "moves": []
+  "maxMoves": 10
 }
 ```
 
@@ -117,7 +115,6 @@ NOTE: The moves field is empty. The numeric `"goal": 1` is treated as a placehol
   "solution": "d2d4",
   "goal": 1,
   "opponentConstraints": [],
-  "maxMoves": 10,
-  "moves": []
+  "maxMoves": 10
 }
 ```
