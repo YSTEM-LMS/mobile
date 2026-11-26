@@ -31,7 +31,7 @@ describe('Lesson Gateway', () => {
     );
   });
 
-  it('accepts and maps structured Goal response fields', async () => {
+  it('accepts and maps a puzzle lesson response', async () => {
     await expect(
       createApiLessonGateway(createClient()).getLesson(request),
     ).resolves.toEqual({
@@ -39,13 +39,56 @@ describe('Lesson Gateway', () => {
       name: 'Sanitized lesson',
       info: 'Sanitized lesson instructions.',
       solution: 'e2e4',
-      goal: { type: 'CAPTURE', min: 1 },
+      goal: null,
       opponentConstraints: [
         { type: 'AVOID_CAPTURING' },
         { type: 'AVOID_SQUARES', squares: ['a1'] },
       ],
       maxMoves: 10,
-      moves: [{ from: 'e2', to: 'e4', piece: 'p' }],
+    });
+  });
+
+  it('accepts a free-play lesson response with a structured goal', async () => {
+    await expect(
+      createApiLessonGateway(
+        createClient({
+          ...sanitizedLessonResponseFixture,
+          solution: null,
+          goal: { type: 'CAPTURE', min: 1 },
+        }),
+      ).getLesson(request),
+    ).resolves.toMatchObject({
+      solution: null,
+      goal: { type: 'CAPTURE', min: 1 },
+    });
+  });
+
+  it('rejects a lesson that has both a solution and a goal', async () => {
+    await expect(
+      createApiLessonGateway(
+        createClient({
+          ...sanitizedLessonResponseFixture,
+          goal: { type: 'CAPTURE', min: 1 },
+        }),
+      ).getLesson(request),
+    ).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+      message: 'Lesson data was not in the expected format',
+    });
+  });
+
+  it('rejects a lesson with neither a solution nor a goal', async () => {
+    await expect(
+      createApiLessonGateway(
+        createClient({
+          ...sanitizedLessonResponseFixture,
+          solution: null,
+          goal: null,
+        }),
+      ).getLesson(request),
+    ).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+      message: 'Lesson data was not in the expected format',
     });
   });
 
