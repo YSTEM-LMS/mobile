@@ -45,7 +45,6 @@ describe('Lesson Gateway', () => {
         { type: 'AVOID_SQUARES', squares: ['a1'] },
       ],
       maxMoves: 10,
-      moves: [{ from: 'e2', to: 'e4', piece: 'p' }],
     });
   });
 

@@ -3,20 +3,6 @@ import type { Goal } from './lesson.types';
 
 const pieceSymbolSchema = z.enum(['p', 'n', 'b', 'r', 'q', 'k']);
 
-const moveSchema = z
-  .object({
-    from: z.string().min(1),
-    to: z.string().min(1),
-    promotion: z.string().optional(),
-    piece: z.string().optional(),
-    captured: z.string().optional(),
-    flags: z.string().optional(),
-    computerMove: z.boolean().optional(),
-    username: z.string().optional(),
-    credentials: z.string().optional(),
-  })
-  .passthrough();
-
 const opponentConstraintSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('AVOID_SQUARES'), squares: z.array(z.string()) }),
   z.object({
@@ -79,7 +65,6 @@ export const LessonResponseSchema = z.object({
   goal: goalSchema.nullish(),
   opponentConstraints: z.array(opponentConstraintSchema).nullish(),
   maxMoves: z.number().int().nonnegative().nullish(),
-  moves: z.array(moveSchema).nullish(),
 });
 
 export type LessonResponse = z.infer<typeof LessonResponseSchema>;

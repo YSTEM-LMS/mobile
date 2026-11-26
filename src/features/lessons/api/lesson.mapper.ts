@@ -26,7 +26,6 @@ export function mapLesson(r: LessonResponse): Lesson {
     goal: r.goal ?? null,
     opponentConstraints: r.opponentConstraints ?? null,
     maxMoves: r.maxMoves ?? null,
-    moves: r.moves ?? null,
   };
 }
 

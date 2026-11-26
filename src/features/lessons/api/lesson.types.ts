@@ -1,17 +1,5 @@
 export type PieceSymbol = 'p' | 'n' | 'b' | 'r' | 'q' | 'k';
 
-export type Move = {
-  from: string;
-  to: string;
-  promotion?: string;
-  piece?: string;
-  captured?: string;
-  flags?: string;
-  computerMove?: boolean;
-  username?: string;
-  credentials?: string;
-};
-
 export type AtomicGoal =
   | { type: 'PROMOTION'; min?: number; piece?: 'q' | 'r' | 'b' | 'n' }
   | {
@@ -48,7 +36,6 @@ export type Lesson = {
   goal: Goal | null;
   opponentConstraints: OpponentConstraint[] | null;
   maxMoves: number | null;
-  moves: Move[] | null;
 };
 
 export type LessonRequest = {
