@@ -4,7 +4,8 @@
  */
 
 // React state tracks which puzzle in the loaded batch is selected.
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Chess, type Square } from 'chess.js';
 import {
   ActivityIndicator,
   Pressable,
@@ -26,6 +27,13 @@ import {
   spacing,
 } from '@/design/tokens';
 // The hook handles loading puzzles, errors, caching, and refetching.
+import {
+  createPuzzleSession,
+  retryPuzzleSession,
+  submitPuzzleMove,
+  type PuzzleSession,
+} from '@/features/puzzles/puzzleSession';
+import type { Puzzle } from '@/features/puzzles/types';
 import { useRandomPuzzles } from '@/features/puzzles/useRandomPuzzles';
 
 // Displays one label/value pair, such as Rating: 1200.
@@ -65,11 +73,131 @@ function Tags({ title, values }: { title: string; values: string[] }) {
   );
 }
 
+type PromotionPiece = 'q' | 'r' | 'b' | 'n';
+
+const promotionOptions: { value: PromotionPiece; label: string }[] = [
+  { value: 'q', label: 'Queen' },
+  { value: 'r', label: 'Rook' },
+  { value: 'b', label: 'Bishop' },
+  { value: 'n', label: 'Knight' },
+];
+
+/** One independent gameplay session per puzzle; the parent remounts it on Next. */
+export function PuzzleGameplay({ puzzle }: { puzzle: Puzzle }) {
+  const [session, setSession] = useState<PuzzleSession>(() =>
+    createPuzzleSession(puzzle),
+  );
+  const [retryCount, setRetryCount] = useState(0);
+  const [promotion, setPromotion] = useState<PromotionPiece>('q');
+
+  // Show promotion choices only if the current position offers a legal promotion.
+  // The available choices do not reveal which promotion the solution expects.
+  const canPromote = useMemo(() => {
+    if (session.status !== 'playing') return false;
+    try {
+      return new Chess(session.fen)
+        .moves({ verbose: true })
+        .some((move) => Boolean(move.promotion));
+    } catch {
+      return false;
+    }
+  }, [session]);
+
+  function handleMove(from: Square, to: Square) {
+    setSession((previous) =>
+      submitPuzzleMove(puzzle, previous, from, to, promotion),
+    );
+  }
+
+  function handleRetry() {
+    setSession(retryPuzzleSession(puzzle));
+    setPromotion('q');
+    setRetryCount((count) => count + 1);
+  }
+
+  if (session.status === 'unplayable') {
+    return (
+      <View style={s.statusCard}>
+        <Text style={s.statusTitle}>Puzzle unavailable</Text>
+        <Text style={s.statusMessage}>{session.message}</Text>
+        <Text style={s.statusMessage}>Choose Next Puzzle to skip it.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.gameplay}>
+      <View style={s.boardWrap}>
+        <ChessBoard_component
+          key={`${puzzle.id}-${retryCount}`}
+          fen={session.fen}
+          orientation={session.studentColor === 'w' ? 'white' : 'black'}
+          disabled={session.status !== 'playing'}
+          showLegalMoves={session.status === 'playing'}
+          lastMove={session.lastMove}
+          onMove={handleMove}
+          labels
+        />
+      </View>
+      <Text style={s.previewNote}>
+        {session.status === 'complete'
+          ? 'Puzzle solved.'
+          : `Your turn — play ${session.studentColor === 'w' ? 'White' : 'Black'}.`}
+      </Text>
+
+      {canPromote && (
+        <View style={s.promotionCard}>
+          <Text style={s.sectionLabel}>Promote pawn to</Text>
+          <View style={s.promotionRow}>
+            {promotionOptions.map(({ value, label }) => (
+              <Pressable
+                key={value}
+                accessibilityRole="button"
+                accessibilityState={{ selected: promotion === value }}
+                onPress={() => setPromotion(value)}
+                style={[
+                  s.promotionButton,
+                  promotion === value && s.promotionSelected,
+                ]}
+              >
+                <Text style={s.promotionButtonText}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {session.feedback && (
+        <View
+          style={[
+            s.feedbackCard,
+            session.feedback.kind === 'incorrect'
+              ? s.feedbackIncorrect
+              : s.feedbackCorrect,
+          ]}
+        >
+          <Text style={s.feedbackText}>{session.feedback.message}</Text>
+        </View>
+      )}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Retry Puzzle"
+        onPress={handleRetry}
+        style={({ pressed }) => [s.retryButton, pressed && s.buttonDimmed]}
+      >
+        <Text style={s.retryButtonText}>Retry Puzzle</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // Main Puzzle screen
-// Displays data but does not play or grade moves.
+// Loads API puzzles and delegates solving to a fresh session for each record.
 export default function PuzzlesRoute() {
   // Which puzzle to show from the batch (starting with the first).
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [batchVersion, setBatchVersion] = useState(0);
   // Fetch validated puzzles through the existing data layer, not directly with fetch().
   const { puzzles, isLoading, isError, error, isRefetching, refetch } =
     useRandomPuzzles();
@@ -80,15 +208,13 @@ export default function PuzzlesRoute() {
   // Only show a puzzle when the hook is not loading or reporting an error.
   const puzzle = !isLoading && !isError ? puzzles?.[activeIndex] : undefined;
 
-  // The recorded first move belongs to the opponent, so the preview faces the student.
-  const boardOrientation =
-    puzzle?.fen.trim().split(/\s+/)[1] === 'w' ? 'black' : 'white';
-
   // Request a fresh batch. After success, show its first puzzle.
   async function handleRefetch() {
     const result = await refetch();
     if (result.isSuccess) {
       setCurrentIndex(0);
+      // Remount the player even if the new batch contains the same puzzle ID.
+      setBatchVersion((version) => version + 1);
     }
   }
 
@@ -191,23 +317,13 @@ export default function PuzzlesRoute() {
           </View>
         )}
 
-        {/* A loaded puzzle: read-only position preview and backend metadata. */}
+        {/* A loaded puzzle: playable position and backend metadata. */}
         {puzzle && (
           <>
-            <View style={s.boardWrap}>
-              {/* The shared board reads the FEN; disabled prevents making moves. */}
-              <ChessBoard_component
-                key={`${puzzle.id}-${puzzle.fen}`}
-                fen={puzzle.fen}
-                orientation={boardOrientation}
-                disabled
-                showLegalMoves={false}
-                labels
-              />
-            </View>
-            <Text style={s.previewNote}>
-              Read-only starting position, before the opponent’s first move.
-            </Text>
+            <PuzzleGameplay
+              key={`${batchVersion}-${activeIndex}-${puzzle.id}-${puzzle.fen}`}
+              puzzle={puzzle}
+            />
 
             {/* Display only fields actually available on the loaded puzzle. */}
             <View style={s.infoCard}>
@@ -337,7 +453,7 @@ const s = StyleSheet.create({
     color: palette.ink,
   },
 
-  // Scrollable content and read-only board preview.
+  // Scrollable content and playable board.
   scroll: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
@@ -355,6 +471,53 @@ const s = StyleSheet.create({
     color: palette.muted,
     textAlign: 'center',
   },
+  gameplay: { gap: spacing.sm },
+  feedbackCard: {
+    borderRadius: radii.md,
+    padding: spacing.md,
+    borderWidth: 1,
+  },
+  feedbackCorrect: {
+    backgroundColor: `${palette.brandGreen}1A`,
+    borderColor: palette.brandGreen,
+  },
+  feedbackIncorrect: {
+    backgroundColor: `${palette.error}1A`,
+    borderColor: palette.error,
+  },
+  feedbackText: {
+    fontSize: fontSizes.label,
+    fontWeight: fontWeights.semibold,
+    color: palette.ink,
+    textAlign: 'center',
+  },
+  retryButton: { alignSelf: 'center', padding: spacing.sm },
+  retryButtonText: {
+    fontSize: fontSizes.label,
+    fontWeight: fontWeights.semibold,
+    color: palette.brandGreen,
+  },
+  promotionCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  promotionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  promotionButton: {
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: radii.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  promotionSelected: {
+    backgroundColor: `${palette.brandGreen}1A`,
+    borderColor: palette.brandGreen,
+  },
+  promotionButtonText: { color: palette.ink, fontSize: fontSizes.caption },
 
   // Puzzle metadata, tag pills, and FEN text.
   infoCard: {
